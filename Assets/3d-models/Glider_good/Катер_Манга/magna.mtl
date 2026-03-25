@@ -1,0 +1,40 @@
+# 3ds Max Wavefront OBJ Exporter v0.97b - (c)2007 guruware
+# File Created: 28.08.2016 00:31:06
+
+newmtl wire_154154229
+	Ns 32
+	d 1
+	Tr 0
+	Tf 1 1 1
+	illum 2
+	Ka 0.6039 0.6039 0.8980
+	Kd 0.6039 0.6039 0.8980
+	Ks 0.3500 0.3500 0.3500
+
+newmtl Material__1
+	Ns 10.0000
+	Ni 1.5000
+	d 1.0000
+	Tr 0.0000
+	Tf 1.0000 1.0000 1.0000 
+	illum 2
+	Ka 0.5880 0.5880 0.5880
+	Kd 0.5880 0.5880 0.5880
+	Ks 0.0000 0.0000 0.0000
+	Ke 0.0000 0.0000 0.0000
+	map_Ka D:\3D models\Sniper Ghost Warrior 2\Vehicles\magna\p3dm.ru_p3dm.ru_magna_960_interior_clr_02.dds
+	map_Kd D:\3D models\Sniper Ghost Warrior 2\Vehicles\magna\p3dm.ru_p3dm.ru_magna_960_interior_clr_02.dds
+
+newmtl Material__0
+	Ns 10.0000
+	Ni 1.5000
+	d 1.0000
+	Tr 0.0000
+	Tf 1.0000 1.0000 1.0000 
+	illum 2
+	Ka 0.5880 0.5880 0.5880
+	Kd 0.5880 0.5880 0.5880
+	Ks 0.0000 0.0000 0.0000
+	Ke 0.0000 0.0000 0.0000
+	map_Ka D:\3D models\Sniper Ghost Warrior 2\Vehicles\magna\p3dm.ru_p3dm.ru_magna_960_body_clr.dds
+	map_Kd D:\3D models\Sniper Ghost Warrior 2\Vehicles\magna\p3dm.ru_p3dm.ru_magna_960_body_clr.dds

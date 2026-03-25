@@ -1,0 +1,858 @@
+# 
+# Wavefront material file
+# Converted by the DEEP Exploration  Deep Exploration 5.5 5.5.3.2642 Release
+# Right Hemisphere, LTD
+# http://www.righthemisphere.com/
+# 
+
+newmtl fishing__15
+Ka 0 0 0
+Kd 1 1 1
+Ks 0.65098 0.65098 0.65098
+illum 2
+Ns 51.9842
+map_Kd bottom_body_dark_stripe.png
+map_bump 
+bump 
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__10
+Ka 0 0 0
+Kd 1 1 1
+Ks 0.737255 0.737255 0.737255
+illum 2
+Ns 18.3792
+map_Kd top_body_black_metal.png
+map_bump 
+bump 
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__06
+Ka 0 0 0
+Kd 1 1 1
+Ks 0.87451 0.87451 0.87451
+illum 2
+Ns 97.0059
+map_Kd superstructure_base_stripe.png
+map_bump superstructure_base_stripe_ddn.png
+bump superstructure_base_stripe_ddn.png
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__04
+Ka 0.431373 0.431373 0.431373
+Kd 1 1 1
+Ks 0.431373 0.431373 0.431373
+illum 2
+Ns 51.9842
+map_Kd superstructure_white_metal.png
+map_bump superstructure_white_metal_ddn.png
+bump superstructure_white_metal_ddn.png
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__02
+Ka 0.470588 0.470588 0.470588
+Kd 1 1 1
+Ks 0.333333 0.333333 0.333333
+illum 2
+Ns 64
+map_Kd ship_details.png
+map_bump 
+bump 
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__14
+Ka 0.160784 0.160784 0.160784
+Kd 1 1 1
+Ks 1 1 1
+illum 2
+Ns 64
+d 0.95
+map_Kd superstructure_glass.png
+map_bump 
+bump 
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__07
+Ka 0 0 0
+Kd 1 1 1
+Ks 0.745098 0.745098 0.745098
+illum 2
+Ns 55.7152
+map_Kd antenne_metal.png
+map_bump 
+bump 
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__05
+Ka 0 0 0
+Kd 1 1 1
+Ks 0.929412 0.929412 0.929412
+illum 2
+Ns 14.9285
+map_Kd deck_wooden_floor.png
+map_bump deck_wooden_floor_ddn.png
+bump deck_wooden_floor_ddn.png
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__11
+Ka 0 0 0
+Kd 1 1 1
+Ks 0.827451 0.827451 0.827451
+illum 2
+Ns 55.7152
+map_Kd bottom_body_dark_red_metal.png
+map_bump 
+bump 
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__13
+Ka 0.470588 0.470588 0.470588
+Kd 1 1 1
+Ks 0.807843 0.807843 0.807843
+illum 2
+Ns 111.43
+map_Kd superstructure_wires.png
+map_bump 
+bump 
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__01
+Ka 0 0 0
+Kd 1 1 1
+Ks 0.580392 0.580392 0.580392
+illum 2
+Ns 315.173
+map_Kd rust_dirt_decal.png
+map_bump 
+bump 
+map_opacity rust_dirt_decal.png
+map_d rust_dirt_decal.png
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing_ship01
+Ka 0.682353 0.682353 0.682353
+Kd 1 1 1
+Ks 0.682353 0.682353 0.682353
+illum 2
+Ns 147.033
+map_Kd ship_decals.png
+map_bump 
+bump 
+map_opacity ship_decals.png
+map_d ship_decals.png
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__03
+Ka 0 0 0
+Kd 1 1 1
+Ks 0.639216 0.639216 0.639216
+illum 2
+Ns 48.5029
+map_Kd bottom_body_dark_stripe.png
+map_bump 
+bump 
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__09
+Ka 0 0 0
+Kd 1 1 1
+Ks 0.709804 0.709804 0.709804
+illum 2
+Ns 181.019
+map_Kd top_body_white_metal.png
+map_bump 
+bump 
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__12
+Ka 0.470588 0.470588 0.470588
+Kd 1 1 1
+Ks 0.764706 0.764706 0.764706
+illum 2
+Ns 137.187
+map_Kd ship_catwalk_spec.png
+map_bump 
+bump 
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__08
+Ka 0 0 0
+Kd 1 1 1
+Ks 0.972549 0.972549 0.972549
+illum 2
+Ns 55.7152
+map_Kd ship_lights.png
+map_bump 
+bump 
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl Material__78
+Ka 0 0 0
+Kd 0 0 0
+Ks 0.65098 0.65098 0.65098
+illum 2
+Ns 51.9842
+map_Kd 
+map_bump 
+bump 
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__150
+Ka 0 0 0
+Kd 1 1 1
+Ks 0.65098 0.65098 0.65098
+illum 2
+Ns 51.9842
+map_Kd bottom_body_dark_stripe.png
+map_bump 
+bump 
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__100
+Ka 0 0 0
+Kd 1 1 1
+Ks 0.737255 0.737255 0.737255
+illum 2
+Ns 18.3792
+map_Kd top_body_black_metal.png
+map_bump 
+bump 
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__060
+Ka 0 0 0
+Kd 1 1 1
+Ks 0.87451 0.87451 0.87451
+illum 2
+Ns 97.0059
+map_Kd superstructure_base_stripe.png
+map_bump superstructure_base_stripe_ddn.png
+bump superstructure_base_stripe_ddn.png
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__040
+Ka 0.431373 0.431373 0.431373
+Kd 1 1 1
+Ks 0.431373 0.431373 0.431373
+illum 2
+Ns 51.9842
+map_Kd superstructure_white_metal.png
+map_bump superstructure_white_metal_ddn.png
+bump superstructure_white_metal_ddn.png
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__140
+Ka 0.160784 0.160784 0.160784
+Kd 1 1 1
+Ks 1 1 1
+illum 2
+Ns 64
+d 0.95
+map_Kd superstructure_glass.png
+map_bump 
+bump 
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__050
+Ka 0 0 0
+Kd 1 1 1
+Ks 0.929412 0.929412 0.929412
+illum 2
+Ns 14.9285
+map_Kd deck_wooden_floor.png
+map_bump deck_wooden_floor_ddn.png
+bump deck_wooden_floor_ddn.png
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__110
+Ka 0 0 0
+Kd 1 1 1
+Ks 0.827451 0.827451 0.827451
+illum 2
+Ns 55.7152
+map_Kd bottom_body_dark_red_metal.png
+map_bump 
+bump 
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__030
+Ka 0 0 0
+Kd 1 1 1
+Ks 0.639216 0.639216 0.639216
+illum 2
+Ns 48.5029
+map_Kd bottom_body_dark_stripe.png
+map_bump 
+bump 
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__090
+Ka 0 0 0
+Kd 1 1 1
+Ks 0.709804 0.709804 0.709804
+illum 2
+Ns 181.019
+map_Kd top_body_white_metal.png
+map_bump 
+bump 
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl Material__61
+Ka 0 0 0
+Kd 0 0 0
+Ks 0.65098 0.65098 0.65098
+illum 2
+Ns 51.9842
+map_Kd 
+map_bump 
+bump 
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__151
+Ka 0 0 0
+Kd 1 1 1
+Ks 0.65098 0.65098 0.65098
+illum 2
+Ns 51.9842
+map_Kd bottom_body_dark_stripe.png
+map_bump 
+bump 
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__101
+Ka 0 0 0
+Kd 1 1 1
+Ks 0.737255 0.737255 0.737255
+illum 2
+Ns 18.3792
+map_Kd top_body_black_metal.png
+map_bump 
+bump 
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__061
+Ka 0 0 0
+Kd 1 1 1
+Ks 0.87451 0.87451 0.87451
+illum 2
+Ns 97.0059
+map_Kd superstructure_base_stripe.png
+map_bump superstructure_base_stripe_ddn.png
+bump superstructure_base_stripe_ddn.png
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__041
+Ka 0.431373 0.431373 0.431373
+Kd 1 1 1
+Ks 0.431373 0.431373 0.431373
+illum 2
+Ns 51.9842
+map_Kd superstructure_white_metal.png
+map_bump superstructure_white_metal_ddn.png
+bump superstructure_white_metal_ddn.png
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__020
+Ka 0.470588 0.470588 0.470588
+Kd 1 1 1
+Ks 0.333333 0.333333 0.333333
+illum 2
+Ns 64
+map_Kd ship_details.png
+map_bump 
+bump 
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__141
+Ka 0.160784 0.160784 0.160784
+Kd 1 1 1
+Ks 1 1 1
+illum 2
+Ns 64
+d 0.95
+map_Kd superstructure_glass.png
+map_bump 
+bump 
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__051
+Ka 0 0 0
+Kd 1 1 1
+Ks 0.929412 0.929412 0.929412
+illum 2
+Ns 14.9285
+map_Kd deck_wooden_floor.png
+map_bump deck_wooden_floor_ddn.png
+bump deck_wooden_floor_ddn.png
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__111
+Ka 0 0 0
+Kd 1 1 1
+Ks 0.827451 0.827451 0.827451
+illum 2
+Ns 55.7152
+map_Kd bottom_body_dark_red_metal.png
+map_bump 
+bump 
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__031
+Ka 0 0 0
+Kd 1 1 1
+Ks 0.639216 0.639216 0.639216
+illum 2
+Ns 48.5029
+map_Kd bottom_body_dark_stripe.png
+map_bump 
+bump 
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__091
+Ka 0 0 0
+Kd 1 1 1
+Ks 0.709804 0.709804 0.709804
+illum 2
+Ns 181.019
+map_Kd top_body_white_metal.png
+map_bump 
+bump 
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__120
+Ka 0.470588 0.470588 0.470588
+Kd 1 1 1
+Ks 0.764706 0.764706 0.764706
+illum 2
+Ns 137.187
+map_Kd ship_catwalk_spec.png
+map_bump 
+bump 
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl Material__50
+Ka 0 0 0
+Kd 0 0 0
+Ks 0.65098 0.65098 0.65098
+illum 2
+Ns 51.9842
+map_Kd 
+map_bump 
+bump 
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__152
+Ka 0 0 0
+Kd 1 1 1
+Ks 0.65098 0.65098 0.65098
+illum 2
+Ns 51.9842
+map_Kd bottom_body_dark_stripe.png
+map_bump 
+bump 
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__102
+Ka 0 0 0
+Kd 1 1 1
+Ks 0.737255 0.737255 0.737255
+illum 2
+Ns 18.3792
+map_Kd top_body_black_metal.png
+map_bump 
+bump 
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__062
+Ka 0 0 0
+Kd 1 1 1
+Ks 0.87451 0.87451 0.87451
+illum 2
+Ns 97.0059
+map_Kd superstructure_base_stripe.png
+map_bump superstructure_base_stripe_ddn.png
+bump superstructure_base_stripe_ddn.png
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__042
+Ka 0.431373 0.431373 0.431373
+Kd 1 1 1
+Ks 0.431373 0.431373 0.431373
+illum 2
+Ns 51.9842
+map_Kd superstructure_white_metal.png
+map_bump superstructure_white_metal_ddn.png
+bump superstructure_white_metal_ddn.png
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__021
+Ka 0.470588 0.470588 0.470588
+Kd 1 1 1
+Ks 0.333333 0.333333 0.333333
+illum 2
+Ns 64
+map_Kd ship_details.png
+map_bump 
+bump 
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__142
+Ka 0.160784 0.160784 0.160784
+Kd 1 1 1
+Ks 1 1 1
+illum 2
+Ns 64
+d 0.95
+map_Kd superstructure_glass.png
+map_bump 
+bump 
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__070
+Ka 0 0 0
+Kd 1 1 1
+Ks 0.745098 0.745098 0.745098
+illum 2
+Ns 55.7152
+map_Kd antenne_metal.png
+map_bump 
+bump 
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__052
+Ka 0 0 0
+Kd 1 1 1
+Ks 0.929412 0.929412 0.929412
+illum 2
+Ns 14.9285
+map_Kd deck_wooden_floor.png
+map_bump deck_wooden_floor_ddn.png
+bump deck_wooden_floor_ddn.png
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__112
+Ka 0 0 0
+Kd 1 1 1
+Ks 0.827451 0.827451 0.827451
+illum 2
+Ns 55.7152
+map_Kd bottom_body_dark_red_metal.png
+map_bump 
+bump 
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__130
+Ka 0.470588 0.470588 0.470588
+Kd 1 1 1
+Ks 0.807843 0.807843 0.807843
+illum 2
+Ns 111.43
+map_Kd superstructure_wires.png
+map_bump 
+bump 
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__032
+Ka 0 0 0
+Kd 1 1 1
+Ks 0.639216 0.639216 0.639216
+illum 2
+Ns 48.5029
+map_Kd bottom_body_dark_stripe.png
+map_bump 
+bump 
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__092
+Ka 0 0 0
+Kd 1 1 1
+Ks 0.709804 0.709804 0.709804
+illum 2
+Ns 181.019
+map_Kd top_body_white_metal.png
+map_bump 
+bump 
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl fishing__121
+Ka 0.470588 0.470588 0.470588
+Kd 1 1 1
+Ks 0.764706 0.764706 0.764706
+illum 2
+Ns 137.187
+map_Kd ship_catwalk_spec.png
+map_bump 
+bump 
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
+
+newmtl Material__38
+Ka 0 0 0
+Kd 0 0 0
+Ks 0.65098 0.65098 0.65098
+illum 2
+Ns 51.9842
+map_Kd 
+map_bump 
+bump 
+map_opacity 
+map_d 
+refl 
+map_kS 
+map_kA 
+map_Ns 
