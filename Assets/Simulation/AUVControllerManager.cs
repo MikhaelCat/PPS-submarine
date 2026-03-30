@@ -1,4 +1,3 @@
-using System;
 using UnityEngine;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,32 +10,64 @@ public class AUVControllerManager : MonoBehaviour
     [Header("AUV Manger")]
     [SerializeField] bool DefaultIncluded = false;
     [SerializeField] InputActionAsset InputActions;
-    [SerializeField] string InputActionsName = "AUVController";
     [SerializeField] string ActionMapName = "AUV";
     [SerializeField] OrbitCamera OrbitCamera;
     
     [System.Serializable]
     public struct IdAndForce
     {
-        [SerializeField] int MotorId;
-        [SerializeField] float Force; // от 100 до -100
+        [SerializeField] public int MotorId;
+        [SerializeField] public float Force; // от 100 до -100
 
         public int Id => MotorId;
         public float Value => Force;
     }
     
     [Header("Manual Control")]
-    [SerializeField] List<IdAndForce> ForwardMove;
-    [SerializeField] List<IdAndForce> BackMove;
-    [SerializeField] List<IdAndForce> LeftMove;
-    [SerializeField] List<IdAndForce> RightMove;
-    [SerializeField] List<IdAndForce> UpMove;
-    [SerializeField] List<IdAndForce> DownMove;
-    [SerializeField] List<IdAndForce> YawMove;
-    [SerializeField] List<IdAndForce> RollMove;
-    [SerializeField] List<IdAndForce> PitchMove;
+    [SerializeField] List<IdAndForce> ForwardMove = new List<IdAndForce>
+    {
+        new IdAndForce { MotorId = 1, Force = 100f },
+        new IdAndForce { MotorId = 2, Force = 100f },
+    };
+    [SerializeField] List<IdAndForce> BackMove = new List<IdAndForce>
+    {
+        new IdAndForce { MotorId = 1, Force = -100f },
+        new IdAndForce { MotorId = 2, Force = -100f },
+    };
+    [SerializeField] List<IdAndForce> LeftMove = new List<IdAndForce>
+    {
+        new IdAndForce { MotorId = 1, Force = -100f },
+        new IdAndForce { MotorId = 2, Force = 100f },
+    };
+    [SerializeField] List<IdAndForce> RightMove = new List<IdAndForce>
+    {
+        new IdAndForce { MotorId = 1, Force = 100f },
+        new IdAndForce { MotorId = 2, Force = -100f },
+    };
+    [SerializeField] List<IdAndForce> UpMove = new List<IdAndForce>
+    {
+        new IdAndForce { MotorId = 3, Force = 100f },
+        new IdAndForce { MotorId = 4, Force = 100f },
+    };
+    [SerializeField] List<IdAndForce> DownMove = new List<IdAndForce>
+    {
+        new IdAndForce { MotorId = 3, Force = -100f },
+        new IdAndForce { MotorId = 4, Force = -100f },
+    };
+    [SerializeField] List<IdAndForce> YawMove = new List<IdAndForce>
+    {
+        new IdAndForce { MotorId = 1, Force = 100f },
+        new IdAndForce { MotorId = 2, Force = -100f },
+    };
+    [SerializeField] List<IdAndForce> RollMove = new List<IdAndForce>();
+    [SerializeField] List<IdAndForce> PitchMove = new List<IdAndForce>
+    {
+        new IdAndForce { MotorId = 3, Force = 100f },
+        new IdAndForce { MotorId = 4, Force = -100f },
+    };
     
     // Флаг включения ручного управления
+    [System.NonSerialized]
     public bool Included;
 
     // === Переменные класса ===
@@ -55,14 +86,136 @@ public class AUVControllerManager : MonoBehaviour
     private AUV[] controlledAUVs = System.Array.Empty<AUV>();
     private int currentAuvIndex = -1;
 
+    private static List<IdAndForce> CreateForwardMove()
+    {
+        return new List<IdAndForce>
+        {
+            new IdAndForce { MotorId = 1, Force = 100f },
+            new IdAndForce { MotorId = 2, Force = 100f },
+        };
+    }
+
+    private static List<IdAndForce> CreateBackMove()
+    {
+        return new List<IdAndForce>
+        {
+            new IdAndForce { MotorId = 1, Force = -100f },
+            new IdAndForce { MotorId = 2, Force = -100f },
+        };
+    }
+
+    private static List<IdAndForce> CreateUpMove()
+    {
+        return new List<IdAndForce>
+        {
+            new IdAndForce { MotorId = 3, Force = 100f },
+            new IdAndForce { MotorId = 4, Force = 100f },
+        };
+    }
+
+    private static List<IdAndForce> CreateDownMove()
+    {
+        return new List<IdAndForce>
+        {
+            new IdAndForce { MotorId = 3, Force = -100f },
+            new IdAndForce { MotorId = 4, Force = -100f },
+        };
+    }
+
+    private static List<IdAndForce> CreateLeftMove()
+    {
+        return new List<IdAndForce>
+        {
+            new IdAndForce { MotorId = 1, Force = -100f },
+            new IdAndForce { MotorId = 2, Force = 100f },
+        };
+    }
+
+    private static List<IdAndForce> CreateRightMove()
+    {
+        return new List<IdAndForce>
+        {
+            new IdAndForce { MotorId = 1, Force = 100f },
+            new IdAndForce { MotorId = 2, Force = -100f },
+        };
+    }
+
+    private static List<IdAndForce> CreateYawMove()
+    {
+        return new List<IdAndForce>
+        {
+            new IdAndForce { MotorId = 1, Force = 100f },
+            new IdAndForce { MotorId = 2, Force = -100f },
+        };
+    }
+
+    private static List<IdAndForce> CreatePitchMove()
+    {
+        return new List<IdAndForce>
+        {
+            new IdAndForce { MotorId = 3, Force = 100f },
+            new IdAndForce { MotorId = 4, Force = -100f },
+        };
+    }
+
+    private bool AreManualMappingsEmpty()
+    {
+        return ForwardMove.Count == 0
+            && BackMove.Count == 0
+            && LeftMove.Count == 0
+            && RightMove.Count == 0
+            && UpMove.Count == 0
+            && DownMove.Count == 0
+            && YawMove.Count == 0
+            && RollMove.Count == 0
+            && PitchMove.Count == 0;
+    }
+
+    private void ApplyDefaultManualMappings()
+    {
+        ForwardMove = CreateForwardMove();
+        BackMove = CreateBackMove();
+        LeftMove = CreateLeftMove();
+        RightMove = CreateRightMove();
+        UpMove = CreateUpMove();
+        DownMove = CreateDownMove();
+        YawMove = CreateYawMove();
+        RollMove = new List<IdAndForce>();
+        PitchMove = CreatePitchMove();
+    }
+
+    private void EnsureDefaultsIfNeeded()
+    {
+        if (ForwardMove == null) ForwardMove = new List<IdAndForce>();
+        if (BackMove == null) BackMove = new List<IdAndForce>();
+        if (LeftMove == null) LeftMove = new List<IdAndForce>();
+        if (RightMove == null) RightMove = new List<IdAndForce>();
+        if (UpMove == null) UpMove = new List<IdAndForce>();
+        if (DownMove == null) DownMove = new List<IdAndForce>();
+        if (YawMove == null) YawMove = new List<IdAndForce>();
+        if (RollMove == null) RollMove = new List<IdAndForce>();
+        if (PitchMove == null) PitchMove = new List<IdAndForce>();
+
+        if (AreManualMappingsEmpty())
+        {
+            ApplyDefaultManualMappings();
+        }
+    }
+
+    private void Reset()
+    {
+        DefaultIncluded = false;
+        ActionMapName = "AUV";
+        ApplyDefaultManualMappings();
+    }
+
     // === Unity жизненный цикл ===
 
     // Инициализация ссылок и ввода
     void Awake()
     {
+        EnsureDefaultsIfNeeded();
         Included = DefaultIncluded;
-
-        InputActions = ResolveInputActionsAsset(InputActions);
 
         if (OrbitCamera == null)
         {
@@ -70,6 +223,11 @@ public class AUVControllerManager : MonoBehaviour
         }
 
         InitInput();
+    }
+
+    void OnValidate()
+    {
+        EnsureDefaultsIfNeeded();
     }
 
     // Стартовая привязка камеры к текущему AUV
@@ -153,7 +311,7 @@ public class AUVControllerManager : MonoBehaviour
     {
         if (InputActions == null)
         {
-            Debug.LogError($"AUVControllerManager: InputActions with name '{InputActionsName}' was not found.", this);
+            Debug.LogError("AUVControllerManager: InputActions is not assigned in Inspector.", this);
             return;
         }
 
@@ -192,50 +350,6 @@ public class AUVControllerManager : MonoBehaviour
         return action;
     }
 
-    // === Поиск InputActionAsset ===
-
-    // Подбирает InputActionAsset по имени из Inspector
-    private InputActionAsset ResolveInputActionsAsset(InputActionAsset preferredAsset)
-    {
-        if (MatchesInputActionsName(preferredAsset))
-        {
-            return preferredAsset;
-        }
-
-        if (preferredAsset != null)
-        {
-            Debug.LogWarning($"AUVControllerManager: Assigned InputActions '{preferredAsset.name}' does not match required name '{InputActionsName}'. Trying auto search.", this);
-        }
-
-        PlayerInput[] playerInputs = UnityEngine.Object.FindObjectsByType<PlayerInput>(FindObjectsInactive.Include);
-        for (int i = 0; i < playerInputs.Length; i++)
-        {
-            InputActionAsset candidate = playerInputs[i].actions;
-            if (MatchesInputActionsName(candidate))
-            {
-                return candidate;
-            }
-        }
-
-        return null;
-    }
-
-    // Проверяет совпадение имени ассета действий
-    private bool MatchesInputActionsName(InputActionAsset asset)
-    {
-        if (asset == null)
-        {
-            return false;
-        }
-
-        if (string.IsNullOrWhiteSpace(InputActionsName))
-        {
-            return true;
-        }
-
-        return string.Equals(asset.name, InputActionsName, StringComparison.Ordinal);
-    }
-
     // === Переключение активного AUV ===
 
     // Обрабатывает переключение активного AUV
@@ -263,7 +377,7 @@ public class AUVControllerManager : MonoBehaviour
             currentAuvIndex = -1;
             if (OrbitCamera != null)
             {
-                OrbitCamera.target = null;
+                OrbitCamera.SetTarget(null, false);
             }
             return;
         }
@@ -297,11 +411,11 @@ public class AUVControllerManager : MonoBehaviour
 
         if (TryGetCurrentAUV(out AUV currentAuv))
         {
-            OrbitCamera.target = currentAuv.transform;
+            OrbitCamera.SetTarget(currentAuv.transform, true);
         }
         else
         {
-            OrbitCamera.target = null;
+            OrbitCamera.SetTarget(null, false);
         }
     }
 
@@ -357,8 +471,19 @@ public class AUVControllerManager : MonoBehaviour
             return false;
         }
 
-        AddActionForces(LeftMove, targetForces);
-        return true;
+        if (HasForces(LeftMove))
+        {
+            AddActionForces(LeftMove, targetForces);
+            return true;
+        }
+
+        if (HasForces(YawMove))
+        {
+            AddActionForces(YawMove, targetForces, -1f);
+            return true;
+        }
+
+        return false;
     }
 
     // Движение вправо
@@ -369,8 +494,19 @@ public class AUVControllerManager : MonoBehaviour
             return false;
         }
 
-        AddActionForces(RightMove, targetForces);
-        return true;
+        if (HasForces(RightMove))
+        {
+            AddActionForces(RightMove, targetForces);
+            return true;
+        }
+
+        if (HasForces(YawMove))
+        {
+            AddActionForces(YawMove, targetForces);
+            return true;
+        }
+
+        return false;
     }
 
     // Движение вверх
@@ -444,6 +580,12 @@ public class AUVControllerManager : MonoBehaviour
     // Добавляет силы текущего действия в общий словарь моторов
     private void AddActionForces(List<IdAndForce> actionForces, Dictionary<int, float> targetForces)
     {
+        AddActionForces(actionForces, targetForces, 1f);
+    }
+
+    // Добавляет силы текущего действия в общий словарь моторов с множителем
+    private void AddActionForces(List<IdAndForce> actionForces, Dictionary<int, float> targetForces, float multiplier)
+    {
         if (actionForces == null)
         {
             return;
@@ -452,7 +594,7 @@ public class AUVControllerManager : MonoBehaviour
         for (int i = 0; i < actionForces.Count; i++)
         {
             IdAndForce motorForce = actionForces[i];
-            float nextForce = motorForce.Value;
+            float nextForce = motorForce.Value * multiplier;
 
             if (targetForces.TryGetValue(motorForce.Id, out float currentForce))
             {
@@ -461,6 +603,12 @@ public class AUVControllerManager : MonoBehaviour
 
             targetForces[motorForce.Id] = Mathf.Clamp(nextForce, -100f, 100f);
         }
+    }
+
+    // Проверяет, что у действия есть моторные силы
+    private static bool HasForces(List<IdAndForce> actionForces)
+    {
+        return actionForces != null && actionForces.Count > 0;
     }
 
     // Применяет рассчитанные силы к моторам активного AUV

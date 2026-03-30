@@ -5,10 +5,20 @@ using UnityEngine;
 // Класс управления
 [RequireComponent(typeof(Collider), typeof(Rigidbody), typeof(WaterObject))] // Требуется Colider и Rigbody и WaterObject
 public class AUV : MonoBehaviour
-{   
+{
+    private static readonly Vector3 DefaultInertiaTensor = new Vector3(3333.3333f, 1666.6666f, 3333.3333f);
+    private const float DefaultMaxYawControlTorque = 705.23f;
+
     // ID
     protected static int nextid = 0;
+    [System.NonSerialized]
     public int id;
+
+    [Header("Dynamics")]
+    [SerializeField] bool applyLegacyInertiaTensor = true;
+    [SerializeField] Vector3 inertiaTensor = new Vector3(3333.3333f, 1666.6666f, 3333.3333f);
+    [SerializeField] bool useMotorForcePoints = true;
+    [SerializeField] float maxYawControlTorque = DefaultMaxYawControlTorque;
 
     // Переменные класса
     protected struct Motor
@@ -19,6 +29,7 @@ public class AUV : MonoBehaviour
 
     protected Motor[] Motors = System.Array.Empty<Motor>();
     protected float ForceRatio = 1;
+    protected float YawControlTorque = 0f;
 
     Rigidbody rb;
     
@@ -32,6 +43,7 @@ public class AUV : MonoBehaviour
     protected virtual void Init()
     {
         rb = GetComponent<Rigidbody>();
+        ApplyLegacyDefaults();
 
         AUVSettings settings = AUVSettings.GetOrFind();
         if (settings == null)
@@ -60,8 +72,26 @@ public class AUV : MonoBehaviour
         // Расчет отношения для диапозона
         ForceRatio = settings.MaxPower / 100f;
     }
+
+    private void ApplyLegacyDefaults()
+    {
+        if (applyLegacyInertiaTensor)
+        {
+            rb.inertiaTensorRotation = Quaternion.identity;
+            rb.inertiaTensor = inertiaTensor;
+        }
+    }
+
+    private void Reset()
+    {
+        applyLegacyInertiaTensor = true;
+        inertiaTensor = DefaultInertiaTensor;
+        useMotorForcePoints = true;
+        maxYawControlTorque = DefaultMaxYawControlTorque;
+    }
+
     private void Awake()
-    {   
+    {
         SetID();
         Init();
     }
@@ -69,6 +99,7 @@ public class AUV : MonoBehaviour
     private void FixedUpdate()
     {
         ApllyMotorForce();
+        ApplyControlTorque();
     }
 
     // Получить мотор по id, если не найден то значение меньше 0 (-1)
@@ -106,17 +137,35 @@ public class AUV : MonoBehaviour
         }
     }
 
+    public void SetYawControlPercent(float percent)
+    {
+        float clampedPercent = Mathf.Clamp(percent, -100f, 100f);
+        YawControlTorque = maxYawControlTorque * (clampedPercent / 100f);
+    }
+
     public void ApllyMotorForce()
     {
         for (int i = 0; i < Motors.Length; i++)
         {
-            rb.AddRelativeForce(Motors[i].force);
+            if (useMotorForcePoints)
+            {
+                Vector3 worldForce = transform.TransformDirection(Motors[i].force);
+                Vector3 worldPoint = transform.TransformPoint(Motors[i].inf.localPoint);
+                rb.AddForceAtPosition(worldForce, worldPoint, ForceMode.Force);
+            }
+            else
+            {
+                rb.AddRelativeForce(Motors[i].force, ForceMode.Force);
+            }
         }
     }
 
-    public void ManualControl()
+    private void ApplyControlTorque()
     {
+        if (!Mathf.Approximately(YawControlTorque, 0f))
+        {
+            rb.AddRelativeTorque(new Vector3(0f, YawControlTorque, 0f), ForceMode.Force);
+        }
     }
-
 
 }
