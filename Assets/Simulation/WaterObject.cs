@@ -9,13 +9,13 @@ public class WaterObject : MonoBehaviour
     private const float DefaultBuoyancyOffsetKg = 1.5f;
     private const float DefaultMetacentricHeight = 0.013f;
     private const float DefaultGenerationStepCOB = 0.25f;
-    private static readonly Vector3 DefaultCenterOfBuoyancy = new Vector3(-6.68785f, 0, -0.0439f);
-    private const float DefaultForwardDrag = 200f;
-    private const float DefaultLateralDrag = 330f;
+    private static readonly Vector3 DefaultCenterOfBuoyancy = new Vector3(-6.68785f, 1.1273f, -0.0439f);
+    private const float DefaultForwardDrag = 700f;
+    private const float DefaultLateralDrag = 230f;
     private const float DefaultVerticalDrag = 407f;
-    private const float DefaultRollDrag = 10000f;
-    private const float DefaultPitchDrag = 10000f;
-    private const float DefaultYawDrag = 10000f;
+    private const float DefaultRollDrag = 380f;
+    private const float DefaultPitchDrag = 380f;
+    private const float DefaultYawDrag = 215f;
 
     // Константы
     static float waterLevelY = 0f;
@@ -28,14 +28,9 @@ public class WaterObject : MonoBehaviour
     [SerializeField] float buoyancyOffsetKg = DefaultBuoyancyOffsetKg; // Дополнительная плавучесть в кг сверх массы объекта
     [SerializeField] Vector3 buoyancyForce = Vector3.up; // Плавучесть | Сила, с которой выталкивается объект | Положительные значеие
     [SerializeField] bool autoCenterOffBuoyancy = false; // True: Автоматический центр | False: использует CenterOffBuoyancy
-    [SerializeField] Vector3 centerOffBuoyancy = new Vector3(-6.68785f, 0, -0.0439f); // Центр всплывания - только при выключенном AutoCenterOffBuoyancy
+    [SerializeField] Vector3 centerOffBuoyancy = new Vector3(-6.68785f, 1.1273f, -0.0439f); // Центр всплывания - только при выключенном AutoCenterOffBuoyancy
     [SerializeField] float metacentricHeight = DefaultMetacentricHeight; // Добавочный сдвиг центра плавучести по продольной оси для остойчивости
     [SerializeField] float GenerationStepCOB = DefaultGenerationStepCOB; // Шаг, с которым генерируются точки - только при включенном AutoCenterOffBuoyancy
-    [SerializeField] bool useMeshForBuoyancySampling = true; // Использовать форму mesh для COB вместо collider
-    [SerializeField] Vector3 meshSamplingRayDirection = new Vector3(1f, 0.37f, 0.13f); // Направление луча для теста точки внутри mesh
-    [SerializeField] int maxCandidateGridPoints = 60000; // Ограничение общего числа точек сетки
-    [SerializeField] int maxMeshTrianglesForSampling = 25000; // Выше этого лимита для стабильности переключаемся на collider sampling
-    [SerializeField] int maxMeshSamplingRayTests = 25000000; // Ограничение общего числа ray/triangle тестов при mesh sampling
 
     // Сопротивление
     [Header("Resistance")]
@@ -48,13 +43,7 @@ public class WaterObject : MonoBehaviour
     [SerializeField] float yawDrag = DefaultYawDrag; // сопротивление вращению вокруг локальной оси Y
 
     // === Переменные класса ===
-    private const float MeshSamplingRayEpsilon = 0.0001f;
-    private static readonly Vector3 MeshSamplingFallbackDirectionA = new Vector3(-0.57f, 1f, 0.21f).normalized;
-    private static readonly Vector3 MeshSamplingFallbackDirectionB = new Vector3(0.19f, -0.41f, 1f).normalized;
-    private Vector3[] COBSamplePoints = System.Array.Empty<Vector3>(); // сетка точек, входящих в объект, гарантируется, что между ними растояние одинаково (если нет разрыва) | Координаты локальные
-    private Mesh buoyancyMesh;
-    private Vector3[] buoyancyMeshVertices = System.Array.Empty<Vector3>();
-    private int[] buoyancyMeshTriangles = System.Array.Empty<int>();
+    private Vector3[] COBSamplePoints = null; // сетка точек, входящих в объект, гарантируется, что между ними растояние одинаково (если нет разрыва) | Координаты локальные
 
     // Компоненты
     private Collider col;
@@ -70,17 +59,8 @@ public class WaterObject : MonoBehaviour
         {
             col = GetComponent<Collider>();
         }
-        if (col == null)
-        {
-            col = GetComponentInChildren<Collider>();
-        }
-        if (col == null || !col.enabled)
-        {
-            col = FindAnyEnabledCollider();
-        }
 
         rb = GetComponent<Rigidbody>();
-        CacheBuoyancyMesh();
         ApplyLegacyDefaultsIfNeeded();
         SetZeroDrag();
         if (autoBuoyancyForce)
@@ -172,34 +152,50 @@ public class WaterObject : MonoBehaviour
         centerOffBuoyancy = DefaultCenterOfBuoyancy;
         metacentricHeight = DefaultMetacentricHeight;
         GenerationStepCOB = DefaultGenerationStepCOB;
-        useMeshForBuoyancySampling = true;
-        meshSamplingRayDirection = new Vector3(1f, 0.37f, 0.13f);
-        maxCandidateGridPoints = 60000;
-        maxMeshTrianglesForSampling = 25000;
-        maxMeshSamplingRayTests = 25000000;
         ApplyLegacyDragDefaults();
     }
 
     // Проверяет, что локальная точка в колайдере
     public bool IsLocalPointInCollider(Vector3 localPoint)
     {
-        if (useMeshForBuoyancySampling && HasValidBuoyancyMesh())
-        {
-            return IsLocalPointInsideMesh(localPoint);
-        }
-
-        if (col == null || !col.enabled)
-        {
-            col = FindAnyEnabledCollider();
-        }
-
-        if (col == null)
-        {
-            return false;
-        }
-
         Vector3 worldPoint = transform.TransformPoint(localPoint);
         return (col.ClosestPoint(worldPoint) - worldPoint).sqrMagnitude < 0.0001f;
+    }
+
+    // Генерирует сетку точек, которые входят в объект | Принимает step
+    protected void GenerateGrid(float step)
+    {
+        Vector3 max = transform.InverseTransformPoint(col.bounds.max);
+        Vector3 min = transform.InverseTransformPoint(col.bounds.min);
+
+        // Максимальные координаты
+        float max_x = max[0];
+        float max_y = max[1];
+        float max_z = max[2];
+
+        // Минимальные координаты
+        float min_x = min[0];
+        float min_y = min[1];
+        float min_z = min[2];
+
+        List<Vector3> tmp_points = new List<Vector3>();
+
+        for (float x = min_x; x <= max_x; x += step)
+        {
+            for (float y = min_y; y <= max_y; y += step)
+            {
+                for (float z = min_z; z <= max_z; z += step)
+                {
+                    Vector3 point = new Vector3(x, y, z);
+                    if (IsLocalPointInCollider(point))
+                    {
+                        tmp_points.Add(point);
+                    }
+                }
+            }
+        }
+
+        COBSamplePoints = tmp_points.ToArray();
     }
 
     // Автоматически создает bouncy, который может сопротевлятся гравитации в полной мере
@@ -226,7 +222,6 @@ public class WaterObject : MonoBehaviour
 
     public void Start()
     {
-        CacheBuoyancyMesh();
         GenerateGrid(GenerationStepCOB);
     }
 
@@ -371,274 +366,5 @@ public class WaterObject : MonoBehaviour
         WaterInformation inf = GetWaterInformation();
         BuoyantForce(inf); // Сначала применяем силу архимеда
         ForceDrag(inf); // Потом применяем сопротивление в этом же момента
-    }
-
-    // === Sampling mesh ===
-
-    private void CacheBuoyancyMesh()
-    {
-        buoyancyMesh = null;
-        buoyancyMeshVertices = System.Array.Empty<Vector3>();
-        buoyancyMeshTriangles = System.Array.Empty<int>();
-
-        if (!useMeshForBuoyancySampling)
-        {
-            return;
-        }
-
-        MeshFilter meshFilter = GetComponent<MeshFilter>();
-        if (meshFilter == null || meshFilter.sharedMesh == null)
-        {
-            return;
-        }
-
-        Mesh mesh = meshFilter.sharedMesh;
-        int[] triangles = mesh.triangles;
-        if (triangles == null || triangles.Length < 3)
-        {
-            return;
-        }
-
-        buoyancyMesh = mesh;
-        buoyancyMeshVertices = mesh.vertices;
-        buoyancyMeshTriangles = triangles;
-
-        int triangleCount = buoyancyMeshTriangles.Length / 3;
-        if (triangleCount > maxMeshTrianglesForSampling)
-        {
-            useMeshForBuoyancySampling = false;
-            Debug.LogWarning(
-                $"WaterObject on {name}: mesh sampling disabled because triangle count is too high ({triangleCount}). " +
-                "Using collider sampling to prevent editor freeze.",
-                this);
-        }
-    }
-
-    private bool HasValidBuoyancyMesh()
-    {
-        return buoyancyMesh != null
-            && buoyancyMeshVertices != null
-            && buoyancyMeshTriangles != null
-            && buoyancyMeshVertices.Length > 0
-            && buoyancyMeshTriangles.Length >= 3;
-    }
-
-    private bool IsLocalPointInsideMesh(Vector3 localPoint)
-    {
-        if (!buoyancyMesh.bounds.Contains(localPoint))
-        {
-            return false;
-        }
-
-        Vector3 primaryDirection = meshSamplingRayDirection.sqrMagnitude < 0.0001f
-            ? new Vector3(1f, 0.37f, 0.13f).normalized
-            : meshSamplingRayDirection.normalized;
-
-        int insideVotes = 0;
-        if (IsLocalPointInsideMeshByDirection(localPoint, primaryDirection))
-        {
-            insideVotes += 1;
-        }
-        if (IsLocalPointInsideMeshByDirection(localPoint, MeshSamplingFallbackDirectionA))
-        {
-            insideVotes += 1;
-        }
-        if (IsLocalPointInsideMeshByDirection(localPoint, MeshSamplingFallbackDirectionB))
-        {
-            insideVotes += 1;
-        }
-
-        return insideVotes >= 2;
-    }
-
-    private bool IsLocalPointInsideMeshByDirection(Vector3 localPoint, Vector3 direction)
-    {
-        Vector3 origin = localPoint + direction * MeshSamplingRayEpsilon;
-        int hitCount = 0;
-
-        for (int i = 0; i < buoyancyMeshTriangles.Length; i += 3)
-        {
-            Vector3 v0 = buoyancyMeshVertices[buoyancyMeshTriangles[i]];
-            Vector3 v1 = buoyancyMeshVertices[buoyancyMeshTriangles[i + 1]];
-            Vector3 v2 = buoyancyMeshVertices[buoyancyMeshTriangles[i + 2]];
-
-            if (RayIntersectsTriangle(origin, direction, v0, v1, v2, out float distance)
-                && distance > MeshSamplingRayEpsilon)
-            {
-                hitCount += 1;
-            }
-        }
-
-        return (hitCount & 1) == 1;
-    }
-
-    private int GetSampleCount(float min, float max, float step)
-    {
-        float range = Mathf.Max(0f, max - min);
-        return Mathf.Max(1, Mathf.CeilToInt(range / step) + 1);
-    }
-
-    protected void GenerateGrid(float step)
-    {
-        GenerateGridInternal(step);
-    }
-
-    private void GenerateGridInternal(float step)
-    {
-        if (step <= 0f)
-        {
-            step = DefaultGenerationStepCOB;
-        }
-
-        Vector3 min;
-        Vector3 max;
-        if (useMeshForBuoyancySampling && HasValidBuoyancyMesh())
-        {
-            min = buoyancyMesh.bounds.min;
-            max = buoyancyMesh.bounds.max;
-        }
-        else
-        {
-            if (col == null || !col.enabled)
-            {
-                col = FindAnyEnabledCollider();
-            }
-
-            if (col == null)
-            {
-                COBSamplePoints = System.Array.Empty<Vector3>();
-                return;
-            }
-
-            Vector3 worldMax = col.bounds.max;
-            Vector3 worldMin = col.bounds.min;
-            max = transform.InverseTransformPoint(worldMax);
-            min = transform.InverseTransformPoint(worldMin);
-        }
-
-        float min_x = min.x;
-        float min_y = min.y;
-        float min_z = min.z;
-        float max_x = max.x;
-        float max_y = max.y;
-        float max_z = max.z;
-
-        int xCount = GetSampleCount(min_x, max_x, step);
-        int yCount = GetSampleCount(min_y, max_y, step);
-        int zCount = GetSampleCount(min_z, max_z, step);
-
-        long candidateCount = (long)xCount * yCount * zCount;
-        if (candidateCount > maxCandidateGridPoints)
-        {
-            float scale = Mathf.Pow((float)candidateCount / Mathf.Max(1, maxCandidateGridPoints), 1f / 3f);
-            step *= Mathf.Max(1f, scale);
-
-            xCount = GetSampleCount(min_x, max_x, step);
-            yCount = GetSampleCount(min_y, max_y, step);
-            zCount = GetSampleCount(min_z, max_z, step);
-            candidateCount = (long)xCount * yCount * zCount;
-        }
-
-        if (useMeshForBuoyancySampling && HasValidBuoyancyMesh())
-        {
-            int triangleCount = buoyancyMeshTriangles.Length / 3;
-            long estimatedRayTests = candidateCount * triangleCount * 3L;
-            if (estimatedRayTests > maxMeshSamplingRayTests)
-            {
-                float scale = Mathf.Pow((float)estimatedRayTests / Mathf.Max(1, maxMeshSamplingRayTests), 1f / 3f);
-                step *= Mathf.Max(1f, scale);
-
-                xCount = GetSampleCount(min_x, max_x, step);
-                yCount = GetSampleCount(min_y, max_y, step);
-                zCount = GetSampleCount(min_z, max_z, step);
-                candidateCount = (long)xCount * yCount * zCount;
-            }
-        }
-
-        List<Vector3> tmp_points = new List<Vector3>((int)Mathf.Min(candidateCount, 500000));
-
-        for (int xi = 0; xi < xCount; xi++)
-        {
-            float x = Mathf.Min(max_x, min_x + (xi * step));
-            for (int yi = 0; yi < yCount; yi++)
-            {
-                float y = Mathf.Min(max_y, min_y + (yi * step));
-                for (int zi = 0; zi < zCount; zi++)
-                {
-                    float z = Mathf.Min(max_z, min_z + (zi * step));
-                    Vector3 point = new Vector3(x, y, z);
-                    if (IsLocalPointInCollider(point))
-                    {
-                        tmp_points.Add(point);
-                    }
-                }
-            }
-        }
-
-        COBSamplePoints = tmp_points.ToArray();
-    }
-
-    private bool RayIntersectsTriangle(
-        Vector3 rayOrigin,
-        Vector3 rayDirection,
-        Vector3 v0,
-        Vector3 v1,
-        Vector3 v2,
-        out float distance)
-    {
-        distance = 0f;
-
-        Vector3 edge1 = v1 - v0;
-        Vector3 edge2 = v2 - v0;
-        Vector3 pvec = Vector3.Cross(rayDirection, edge2);
-        float det = Vector3.Dot(edge1, pvec);
-
-        if (Mathf.Abs(det) < MeshSamplingRayEpsilon)
-        {
-            return false;
-        }
-
-        float invDet = 1f / det;
-        Vector3 tvec = rayOrigin - v0;
-        float u = Vector3.Dot(tvec, pvec) * invDet;
-        if (u < 0f || u > 1f)
-        {
-            return false;
-        }
-
-        Vector3 qvec = Vector3.Cross(tvec, edge1);
-        float v = Vector3.Dot(rayDirection, qvec) * invDet;
-        if (v < 0f || u + v > 1f)
-        {
-            return false;
-        }
-
-        float t = Vector3.Dot(edge2, qvec) * invDet;
-        if (t <= MeshSamplingRayEpsilon)
-        {
-            return false;
-        }
-
-        distance = t;
-        return true;
-    }
-
-    private Collider FindAnyEnabledCollider()
-    {
-        Collider[] colliders = GetComponentsInChildren<Collider>(true);
-        for (int i = 0; i < colliders.Length; i++)
-        {
-            if (colliders[i] != null && colliders[i].enabled)
-            {
-                return colliders[i];
-            }
-        }
-
-        if (colliders.Length > 0)
-        {
-            return colliders[0];
-        }
-
-        return null;
     }
 }
