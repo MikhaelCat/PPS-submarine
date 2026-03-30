@@ -66,6 +66,10 @@ sysinfo.txt
 # Mono auto generated files
 mono_crash.*
 
+# Timur test scene
+testScene1337.unity
+testScene1337.unity.meta
+
 # Builds
 *.apk
 *.aab
