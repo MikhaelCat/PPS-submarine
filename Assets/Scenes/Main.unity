@@ -2866,6 +2866,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SceneLoader
   mapsEditPanel: {fileID: 1121336078}
+  backgroundVisual: {fileID: 874462504}
+  startText: {fileID: 1782166870}
+  port: 12345
 --- !u!1 &832575517
 GameObject:
   m_ObjectHideFlags: 0

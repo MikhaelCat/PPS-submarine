@@ -4,10 +4,10 @@ using System.Collections.Generic;
 
 public class MapScaleController : MonoBehaviour
 {
-    public Transform mapContainer; // Объект карты в редакторе
+    public Transform mapContainer;
 
-    // СТАТИЧЕСКАЯ ПЕРЕМЕННАЯ: хранит масштаб для всех сцен. 
-    // По умолчанию 1.0f (соответствует 1000x1000)
+    // СТАТИЧЕСКАЯ ПЕРЕМЕННАЯ: сохраняет значение между сценами
+    // 1.0f соответствует масштабу 1000x1000
     public static float GlobalScaleFactor = 1.0f;
 
     [Header("Настройки цветов")]
@@ -18,11 +18,11 @@ public class MapScaleController : MonoBehaviour
 
     void Start()
     {
-        // При старте подсвечиваем кнопку, соответствующую текущему GlobalScaleFactor
-        float currentScaleInUnits = GlobalScaleFactor * 1000f;
+        // При старте подсвечиваем кнопку, которая соответствует текущему GlobalScaleFactor
+        float currentScaleValue = GlobalScaleFactor * 1000f;
         foreach (Button btn in scaleButtons)
         {
-            if (btn != null && btn.gameObject.name == currentScaleInUnits.ToString())
+            if (btn != null && btn.gameObject.name == currentScaleValue.ToString())
             {
                 SetMapScale(btn);
                 break;
@@ -34,7 +34,6 @@ public class MapScaleController : MonoBehaviour
     {
         if (clickedButton == null) return;
 
-        // Визуальное переключение кнопок
         foreach (Button btn in scaleButtons)
         {
             if (btn != null)
@@ -51,15 +50,14 @@ public class MapScaleController : MonoBehaviour
         clickedCb.normalColor = selectedColor;
         clickedButton.colors = clickedCb;
 
-        // Удаление старых точек при смене масштаба
+        // Удаление старых точек
         GameObject[] oldMarkers = GameObject.FindGameObjectsWithTag("Marker");
         foreach (var m in oldMarkers) Destroy(m);
 
         // МАСШТАБИРОВАНИЕ
         if (float.TryParse(clickedButton.gameObject.name, out float value))
         {
-            GlobalScaleFactor = value / 1000f; // Сохраняем в статическую память
-
+            GlobalScaleFactor = value / 1000f; // Сохраняем масштаб в "память"
             if (mapContainer != null)
             {
                 mapContainer.localScale = new Vector3(GlobalScaleFactor, mapContainer.localScale.y, GlobalScaleFactor);
