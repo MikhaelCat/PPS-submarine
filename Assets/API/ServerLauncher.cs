@@ -10,14 +10,10 @@ public class ServerLauncher : MonoBehaviour
 
     void Start()
     {
-        // Инициализация ядра
         _server = new ServerRuntime(port);
 
-        // --- БИНДИНГ ФУНКЦИЙ (Пример из ТЗ) ---
         _server.AddRequest("set_player_speed", (values) =>
         {
-            // Важно: Newtonsoft парсит числа как Int64 или Double. 
-            // Используем Convert.ToDouble для безопасного извлечения.
 
             if (!values.ContainsKey("speed") || !values.ContainsKey("duration"))
             {
@@ -27,11 +23,6 @@ public class ServerLauncher : MonoBehaviour
             double speed = System.Convert.ToDouble(values["speed"]);
             double duration = System.Convert.ToDouble(values["duration"]);
 
-            // ВАЖНО: Так как это выполняется не в Main Thread, здесь нельзя напрямую
-            // вызывать методы Unity API (например, transform.position). 
-            // Если нужно передать данные в Unity, их нужно сложить в ConcurrentQueue.
-
-            // Формируем результат для возврата клиенту
             var result = new Dictionary<string, object>
             {
                 { "currentSpeed", speed },
@@ -40,14 +31,11 @@ public class ServerLauncher : MonoBehaviour
 
             return (200, "Success", result);
         });
-
-        // Пример: Команда, которая всегда выдает ошибку (для проверки 500)
         _server.AddRequest("force_error", (values) =>
         {
             throw new System.Exception("This is a simulated crash inside a bound function.");
         });
 
-        // Запуск
         _server.Start();
         Debug.Log($"UDP API Server started on port {port} (Autonomous Mode)");
     }
