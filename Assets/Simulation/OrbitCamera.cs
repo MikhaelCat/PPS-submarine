@@ -1,72 +1,85 @@
-// Wibe code
 using UnityEngine;
+using UnityEngine.InputSystem;
 
-public class CameraFollow : MonoBehaviour
+public class OrbitCamera : MonoBehaviour
 {
-    [Header("Цель")]
-    public Transform target; // Сюда перетащи свой подводный аппарат в инспекторе
-
-    [Header("Настройки дистанции")]
-    public float distance = 7.0f;     // На каком расстоянии от объекта камера
-    public float minDistance = 2.0f;   // Минимальный зум
-    public float maxDistance = 15.0f;  // Максимальный зум
-
-    [Header("Скорость вращения")]
-    public float xSpeed = 120.0f; // Скорость по горизонтали
-    public float ySpeed = 120.0f; // Скорость по вертикали
-
-    [Header("Ограничения углов")]
-    public float yMinLimit = -20f; // Чтобы не заглядывать слишком сильно под дно
+    // === Unity параметры ===
+    public Transform target;
+    public float distance = 7.0f;
+    public float minDistance = 2.0f;
+    public float maxDistance = 15.0f;
+    public float xSpeed = 20.0f;
+    public float ySpeed = 20.0f;
+    public float yMinLimit = -20f;
     public float yMaxLimit = 80f;
 
+    // === Переменные класса ===
     private float x = 0.0f;
     private float y = 0.0f;
 
+    // Инициализирует стартовые углы камеры
     void Start()
     {
-        // Инициализируем текущие углы камеры
         Vector3 angles = transform.eulerAngles;
         x = angles.y;
         y = angles.x;
+    }
 
-        // Если цель не назначена, пробуем найти объект с твоим скриптом WaterObject
+    // Обновляет орбитальную камеру после движения цели
+    void LateUpdate()
+    {
         if (target == null)
         {
-            var obj = FindFirstObjectByType<WaterObject>();
-            if (obj != null) target = obj.transform;
+            return;
         }
+
+        HandleRotationInput();
+        HandleZoomInput();
+        UpdateCameraTransform();
     }
 
-    void LateUpdate() // Камера всегда обновляется в LateUpdate
+    // Обрабатывает поворот камеры правой кнопкой мыши
+    private void HandleRotationInput()
     {
-        if (target)
+        if (Mouse.current == null || !Mouse.current.rightButton.isPressed)
         {
-            // Вращение происходит при зажатой правой кнопке мыши (удобно для тестов)
-            // Если хочешь всегда — убери условие Input.GetMouseButton(1)
-            if (Input.GetMouseButton(1))
-            {
-                x += Input.GetAxis("Mouse X") * xSpeed * 0.02f;
-                y -= Input.GetAxis("Mouse Y") * ySpeed * 0.02f;
-            }
+            return;
+        }
 
-            // Ограничиваем вертикальный угол
-            y = ClampAngle(y, yMinLimit, yMaxLimit);
+        Vector2 mouseDelta = Mouse.current.delta.ReadValue();
 
-            // Обработка Зума (колесико мыши)
-            distance = Mathf.Clamp(distance - Input.GetAxis("Mouse ScrollWheel") * 5, minDistance, maxDistance);
+        x += mouseDelta.x * xSpeed * Time.deltaTime;
+        y -= mouseDelta.y * ySpeed * Time.deltaTime;
+        y = ClampAngle(y, yMinLimit, yMaxLimit);
+    }
 
-            // Рассчитываем вращение и позицию
-            Quaternion rotation = Quaternion.Euler(y, x, 0);
-            Vector3 negDistance = new Vector3(0.0f, 0.0f, -distance);
-            Vector3 position = rotation * negDistance + target.position;
+    // Обрабатывает зум колесиком мыши
+    private void HandleZoomInput()
+    {
+        if (Mouse.current == null)
+        {
+            return;
+        }
 
-            // Применяем значения
-            transform.rotation = rotation;
-            transform.position = position;
+        float scroll = Mouse.current.scroll.ReadValue().y;
+        if (scroll != 0)
+        {
+            distance = Mathf.Clamp(distance - (scroll * 0.01f), minDistance, maxDistance);
         }
     }
 
-    // Вспомогательная функция для ограничения углов
+    // Выставляет финальные позицию и поворот камеры
+    private void UpdateCameraTransform()
+    {
+        Quaternion rotation = Quaternion.Euler(y, x, 0);
+        Vector3 negDistance = new Vector3(0.0f, 0.0f, -distance);
+        Vector3 position = rotation * negDistance + target.position;
+
+        transform.rotation = rotation;
+        transform.position = position;
+    }
+
+    // Ограничивает угол в заданном диапазоне
     public static float ClampAngle(float angle, float min, float max)
     {
         if (angle < -360F) angle += 360F;

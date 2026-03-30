@@ -40,11 +40,13 @@ public class WaterObject :  MonoBehaviour
     // === Инициализация | Стартовая генерация ===
 
     // Инициализация параметров и получение компонентов
-    protected void Init()
+    protected virtual void Init()
     {
         col = GetComponent<Collider>();
         rb = GetComponent<Rigidbody>();
         if (GenerationStepCOB <= 0) GenerationStepCOB = 0.25f;
+        SetZeroDrag();
+        if (autoBuoyancyForce) AutoBouncy();
     }
     
 
@@ -99,14 +101,15 @@ public class WaterObject :  MonoBehaviour
         rb.linearDamping = 0f;
         rb.angularDamping = 0f;
     }
-    
+
     // Стартовая настройка
+    public void Awake()
+    {
+        Init();
+    }
     public void Start()
     {   
-        Init();
         GenerateGrid(GenerationStepCOB);
-        if (autoBuoyancyForce) AutoBouncy();
-        SetZeroDrag();
     }
 
     // === Физика ===
