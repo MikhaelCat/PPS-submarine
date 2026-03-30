@@ -9,13 +9,13 @@ public class WaterObject : MonoBehaviour
     private const float DefaultBuoyancyOffsetKg = 1.5f;
     private const float DefaultMetacentricHeight = 0.013f;
     private const float DefaultGenerationStepCOB = 0.25f;
-    private static readonly Vector3 DefaultCenterOfBuoyancy = new Vector3(-6.68785f, 1.1273f, -0.0439f);
+    private static readonly Vector3 DefaultCenterOfBuoyancy = new Vector3(-6.68785f, 0, -0.0439f);
     private const float DefaultForwardDrag = 700f;
-    private const float DefaultLateralDrag = 230f;
-    private const float DefaultVerticalDrag = 407f;
-    private const float DefaultRollDrag = 380f;
-    private const float DefaultPitchDrag = 380f;
-    private const float DefaultYawDrag = 215f;
+    private const float DefaultLateralDrag = 1000f;
+    private const float DefaultVerticalDrag = 2000f;
+    private const float DefaultRollDrag = 10_000f;
+    private const float DefaultPitchDrag = 10_000f;
+    private const float DefaultYawDrag =10_000f;
 
     // Константы
     static float waterLevelY = 0f;
@@ -363,6 +363,11 @@ public class WaterObject : MonoBehaviour
 
     protected virtual void FixedUpdate()
     {
+        if (COBSamplePoints == null || COBSamplePoints.Length == 0)
+        {
+            return;
+        }
+
         WaterInformation inf = GetWaterInformation();
         BuoyantForce(inf); // Сначала применяем силу архимеда
         ForceDrag(inf); // Потом применяем сопротивление в этом же момента

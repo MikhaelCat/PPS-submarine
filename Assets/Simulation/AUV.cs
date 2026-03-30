@@ -20,6 +20,8 @@ public class AUV : MonoBehaviour
     [SerializeField] bool useMotorForcePoints = true;
     [SerializeField] float maxYawControlTorque = DefaultMaxYawControlTorque;
 
+    [Header("UI")]
+    [SerializeField] bool UIOn = false;
     // Переменные класса
     protected struct Motor
     {
@@ -73,6 +75,12 @@ public class AUV : MonoBehaviour
 
         // Расчет отношения для диапозона
         ForceRatio = settings.MaxPower / 100f;
+
+        // MBES
+        MBESInit();
+
+        // UI
+        UIInit();
     }
 
     private void ApplyLegacyDefaults()
@@ -116,6 +124,8 @@ public class AUV : MonoBehaviour
         }
         return -1;
     }
+
+    // === МОТОРЫ ===
 
     // Устанавли вает скорость мотору по id | 1 ошибка нет id, 2 сила не в диапозоне -100 - 100, 0 - все ок
     public int SetMotorForce(int id, float force)
@@ -185,4 +195,38 @@ public class AUV : MonoBehaviour
         }
     }
 
+    // === MBES ===
+    void MBESInit()
+    {
+        
+    }
+
+
+
+    // === UI ===
+    void MBESDisplay()
+    {
+        
+    }
+    void MotorInfDisplay()
+    {
+        
+    }
+    void PositionDisplay()
+    {
+        
+    }
+    void UIInit()
+    {
+        if (!UIOn) return;
+
+    }
+    void UIDisplay()
+    {
+        if (!UIOn) return;
+    }
+    void Update()
+    {
+        UIDisplay();
+    }
 }
