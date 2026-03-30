@@ -26,7 +26,7 @@ RenderSettings:
   m_AmbientIntensity: 1
   m_AmbientMode: 0
   m_SubtractiveShadowColor: {r: 0.42, g: 0.478, b: 0.627, a: 1}
-  m_SkyboxMaterial: {fileID: 10304, guid: 0000000000000000f000000000000000, type: 0}
+  m_SkyboxMaterial: {fileID: 2100000, guid: cdbb40e11399e4a17882ada20a1b896a, type: 2}
   m_HaloStrength: 0.5
   m_FlareStrength: 1
   m_FlareFadeSpeed: 3
@@ -207,7 +207,7 @@ Transform:
   m_GameObject: {fileID: 96599300}
   serializedVersion: 2
   m_LocalRotation: {x: 0.4197136, y: -0, z: -0, w: 0.9076566}
-  m_LocalPosition: {x: 14.59, y: 24.08, z: -54.83}
+  m_LocalPosition: {x: 14.59, y: 71.5, z: -76.4}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -270,13 +270,21 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CameraFollow
   target: {fileID: 543450652014597277}
-  distance: 7
-  minDistance: 2
-  maxDistance: 15
+  distance: 30
+  minDistance: 20
+  maxDistance: 100
   xSpeed: 120
   ySpeed: 120
+  zoomSpeed: 0.01
   yMinLimit: -20
   yMaxLimit: 80
+  autoFrameTargetOnStart: 1
+  framingPadding: 1.3
+--- !u!4 &638403449 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -679293833045382201, guid: aafe6a9e1a4bde242b747da8d043abae, type: 3}
+  m_PrefabInstance: {fileID: 1693823862}
+  m_PrefabAsset: {fileID: 0}
 --- !u!114 &748920247
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -284,13 +292,15 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 919132147493146151}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ae140be6b7ea7a54bbd0682891e916d9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ObjPartsLogger
   includeInactive: 1
   coordinateMode: 1
+  logOnStart: 1
+  logEachPartSeparately: 1
 --- !u!64 &748920248
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -308,9 +318,9 @@ MeshCollider:
   m_LayerOverridePriority: 0
   m_IsTrigger: 0
   m_ProvidesContacts: 0
-  m_Enabled: 0
+  m_Enabled: 1
   serializedVersion: 5
-  m_Convex: 0
+  m_Convex: 1
   m_CookingOptions: 30
   m_Mesh: {fileID: 0}
 --- !u!23 &748920249
@@ -320,7 +330,7 @@ MeshRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 919132147493146151}
-  m_Enabled: 0
+  m_Enabled: 1
   m_CastShadows: 1
   m_ReceiveShadows: 1
   m_DynamicOccludee: 1
@@ -377,12 +387,15 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 919132147493146151}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: cee6a6c0129cb7d4093f2fe1a091acca, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AUV
-  id: 0
+  applyLegacyInertiaTensor: 1
+  inertiaTensor: {x: 3333.3333, y: 1666.6666, z: 3333.3333}
+  useMotorForcePoints: 1
+  maxYawControlTorque: 705.23
 --- !u!114 &748920252
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -390,22 +403,29 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 919132147493146151}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fd1964fd40537b249927428ac6f772a5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::WaterObject
-  autoBuoyancyForce: 0
+  autoBuoyancyForce: 1
+  buoyancyOffsetKg: 1.5
   buoyancyForce: {x: 0, y: 1, z: 0}
-  autoCenterOffBuoyancy: 1
-  centerOffBuoyancy: {x: 0, y: 0, z: 0}
+  autoCenterOffBuoyancy: 0
+  centerOffBuoyancy: {x: -6.68785, y: 0, z: -0.0439}
+  metacentricHeight: 0.013
   GenerationStepCOB: 0.25
-  forwardDrag: 0
-  lateralDrag: 0
-  verticalDrag: 0
-  rollDrag: 0
-  pitchDrag: 0
-  yawDrag: 0
+  useMeshForBuoyancySampling: 1
+  meshSamplingRayDirection: {x: 1, y: 0.37, z: 0.13}
+  maxCandidateGridPoints: 60000
+  maxMeshTrianglesForSampling: 25000
+  maxMeshSamplingRayTests: 25000000
+  forwardDrag: 400
+  lateralDrag: 230
+  verticalDrag: 407
+  rollDrag: 600
+  pitchDrag: 600
+  yawDrag: 600
 --- !u!54 &748920253
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -414,10 +434,10 @@ Rigidbody:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 919132147493146151}
   serializedVersion: 5
-  m_Mass: 1
+  m_Mass: 1000
   m_LinearDamping: 0
   m_AngularDamping: 0.05
-  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_CenterOfMass: {x: -6.68785, y: -1.1273, z: 0.0439}
   m_InertiaTensor: {x: 1, y: 1, z: 1}
   m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
   m_IncludeLayers:
@@ -426,7 +446,7 @@ Rigidbody:
   m_ExcludeLayers:
     serializedVersion: 2
     m_Bits: 0
-  m_ImplicitCom: 1
+  m_ImplicitCom: 0
   m_ImplicitTensor: 1
   m_UseGravity: 1
   m_IsKinematic: 0
@@ -440,7 +460,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 919132147493146151}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 2e0528e582dbee447bd310cdc57f9073, type: 3}
   m_Name: 
@@ -450,7 +470,25 @@ MonoBehaviour:
   deactivateSourceObjects: 1
   rebuildMeshCollider: 1
   convexForDynamicRigidbody: 1
+  buildCompoundConvexForDynamic: 1
+  maxTrianglesPerConvexPart: 192
+  disableRootMeshColliderWhenCompound: 1
   disableOtherRootColliders: 1
+--- !u!4 &1112916278 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -7112408738294317886, guid: aafe6a9e1a4bde242b747da8d043abae, type: 3}
+  m_PrefabInstance: {fileID: 1693823862}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &1243402298 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 6330874674550404234, guid: aafe6a9e1a4bde242b747da8d043abae, type: 3}
+  m_PrefabInstance: {fileID: 1693823862}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &1447383731 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 8870174692466809803, guid: aafe6a9e1a4bde242b747da8d043abae, type: 3}
+  m_PrefabInstance: {fileID: 1693823862}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1479718057
 GameObject:
   m_ObjectHideFlags: 0
@@ -462,6 +500,7 @@ GameObject:
   - component: {fileID: 1479718060}
   - component: {fileID: 1479718062}
   - component: {fileID: 1479718061}
+  - component: {fileID: 1479718063}
   m_Layer: 0
   m_Name: AUVGlobalScripts
   m_TagString: Untagged
@@ -491,7 +530,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1479718057}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 8d9fb7a9b09b9ee4192446478a8e1deb, type: 3}
   m_Name: 
@@ -500,15 +539,39 @@ MonoBehaviour:
   InputActions: {fileID: -944628639613478452, guid: 7d7ce558a7423f74ebbc63ef9167a4a5, type: 3}
   ActionMapName: AUV
   OrbitCamera: {fileID: 96599305}
-  ForwardMove: []
-  BackMove: []
+  ForwardMove:
+  - MotorId: 1
+    Force: 100
+  - MotorId: 2
+    Force: 100
+  BackMove:
+  - MotorId: 1
+    Force: -100
+  - MotorId: 2
+    Force: -100
   LeftMove: []
   RightMove: []
-  UpMove: []
-  DownMove: []
-  YawMove: []
+  UpMove:
+  - MotorId: 3
+    Force: 100
+  - MotorId: 4
+    Force: 100
+  DownMove:
+  - MotorId: 3
+    Force: -100
+  - MotorId: 4
+    Force: -100
+  YawMove:
+  - MotorId: 1
+    Force: 100
+  - MotorId: 2
+    Force: -100
   RollMove: []
-  PitchMove: []
+  PitchMove:
+  - MotorId: 3
+    Force: 100
+  - MotorId: 4
+    Force: -100
 --- !u!114 &1479718062
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -516,13 +579,41 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1479718057}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 8302819586c81864e924fdbceaa89b5f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AUVSettings
-  maxPower: 100
-  forcePoints: []
+  maxPower: 2000
+  forcePoints:
+  - id: 1
+    localPoint: {x: -2.5943, y: -0.2098, z: 3.5286}
+    localDirection: {x: 1, y: 0, z: 0}
+  - id: 2
+    localPoint: {x: -2.5943, y: -0.2109, z: -3.5237}
+    localDirection: {x: 1, y: 0, z: 0}
+  - id: 3
+    localPoint: {x: -1.5834, y: 1.1273, z: -0.0439}
+    localDirection: {x: 0, y: 1, z: 0}
+  - id: 4
+    localPoint: {x: -11.7923, y: 1.1273, z: -0.0439}
+    localDirection: {x: 0, y: 1, z: 0}
+--- !u!114 &1479718063
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1479718057}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 88af9630a504fdc4a8b0c39d53e5abec, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AUVAnimationSettings
+  TopFrontMotorId: 3
+  TopRearMotorId: 4
+  SideLeftMotorId: 1
+  SideRightMotorId: 2
 --- !u!1001 &1693823862
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -571,9 +662,25 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -5964700851240400624, guid: aafe6a9e1a4bde242b747da8d043abae, type: 3}
+      propertyPath: m_Name
+      value: Properell2
+      objectReference: {fileID: 0}
+    - target: {fileID: -2150458211637974033, guid: aafe6a9e1a4bde242b747da8d043abae, type: 3}
+      propertyPath: m_Name
+      value: Properell4
+      objectReference: {fileID: 0}
+    - target: {fileID: -891437398542064133, guid: aafe6a9e1a4bde242b747da8d043abae, type: 3}
+      propertyPath: m_Name
+      value: Properell3
+      objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: aafe6a9e1a4bde242b747da8d043abae, type: 3}
       propertyPath: m_Name
       value: Glider+good2
+      objectReference: {fileID: 0}
+    - target: {fileID: 4743910027291752497, guid: aafe6a9e1a4bde242b747da8d043abae, type: 3}
+      propertyPath: m_Name
+      value: Properell1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -591,6 +698,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: aafe6a9e1a4bde242b747da8d043abae, type: 3}
       insertIndex: -1
       addedObject: {fileID: 748920251}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: aafe6a9e1a4bde242b747da8d043abae, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 919132147493146152}
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: aafe6a9e1a4bde242b747da8d043abae, type: 3}
       insertIndex: -1
       addedObject: {fileID: 748920250}
@@ -854,6 +964,29 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: aafe6a9e1a4bde242b747da8d043abae, type: 3}
   m_PrefabInstance: {fileID: 1693823862}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &919132147493146152
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 919132147493146151}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1b78de160b2f39c47b9d967dd8904a24, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AUVAnimation
+  auv: {fileID: 748920251}
+  animationSettings: {fileID: 1479718063}
+  topFrontMotorPart: {fileID: 638403449}
+  topRearMotorPart: {fileID: 1447383731}
+  sideLeftMotorPart: {fileID: 1112916278}
+  sideRightMotorPart: {fileID: 1243402298}
+  maxDegreesPerSecond: 1440
+  topMotorsAxis: {x: 1, y: 0, z: 0}
+  sideMotorsAxis: {x: 1, y: 0, z: 0}
+  invertTopMotors: 0
+  invertSideMotors: 0
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

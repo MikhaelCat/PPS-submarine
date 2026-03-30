@@ -25,6 +25,7 @@ public class AUV : MonoBehaviour
     {
         public AUVSettings.ForcePoint inf;
         public Vector3 force;
+        public float commandPercent;
     }
 
     protected Motor[] Motors = System.Array.Empty<Motor>();
@@ -63,7 +64,8 @@ public class AUV : MonoBehaviour
                 new Motor
                 {
                     inf = forcePoints[i],
-                    force = new Vector3(0, 0, 0)
+                    force = new Vector3(0, 0, 0),
+                    commandPercent = 0f
                 }
                 );
         }
@@ -124,6 +126,7 @@ public class AUV : MonoBehaviour
         if (MotorIndex < 0) return 1;
         
         Motors[MotorIndex].force = Motors[MotorIndex].inf.localDirection * (ForceRatio * force);
+        Motors[MotorIndex].commandPercent = force;
 
         return 0;
     }
@@ -135,6 +138,20 @@ public class AUV : MonoBehaviour
         {
             SetMotorForce(Motors[i].inf.id, clampedForce);
         }
+    }
+
+    // Возвращает последнее заданное значение мотора в диапазоне -100..100
+    public bool TryGetMotorCommandPercent(int motorId, out float percent)
+    {
+        int motorIndex = GetMotorIndexById(motorId);
+        if (motorIndex < 0)
+        {
+            percent = 0f;
+            return false;
+        }
+
+        percent = Motors[motorIndex].commandPercent;
+        return true;
     }
 
     public void SetYawControlPercent(float percent)
