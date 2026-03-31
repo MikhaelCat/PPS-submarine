@@ -86,6 +86,7 @@ public class AUVControllerManager : MonoBehaviour
     private AUV[] controlledAUVs = System.Array.Empty<AUV>();
     private int currentAuvIndex = -1;
     private int currentAuvId = -1;
+    private bool manualControlWasIncluded = false;
 
     private static List<IdAndForce> CreateForwardMove()
     {
@@ -279,6 +280,7 @@ public class AUVControllerManager : MonoBehaviour
                 SetOrbitTargetToCurrentAUV();
             }
 
+            manualControlWasIncluded = false;
             return;
         }
 
@@ -286,9 +288,16 @@ public class AUVControllerManager : MonoBehaviour
 
         if (!Included)
         {
-            currentAuv.SetAllMotorForces(0f);
+            if (manualControlWasIncluded)
+            {
+                currentAuv.SetAllMotorForces(0f);
+            }
+
+            manualControlWasIncluded = false;
             return;
         }
+
+        manualControlWasIncluded = true;
 
         Dictionary<int, float> targetForces = new Dictionary<int, float>();
         bool hasInput = false;

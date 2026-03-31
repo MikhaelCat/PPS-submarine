@@ -524,7 +524,14 @@ public class AUV : MonoBehaviour
     {
         if (!UIOn) return;
 
-        EnsureUIResources();
+        if (uiFillTexture == null)
+        {
+            uiFillTexture = new Texture2D(1, 1, TextureFormat.RGBA32, false);
+            uiFillTexture.SetPixel(0, 0, Color.white);
+            uiFillTexture.Apply(false, false);
+        }
+
+        EnsureMBESTexture();
     }
 
     private void EnsureUIResources()
@@ -538,7 +545,7 @@ public class AUV : MonoBehaviour
 
         if (uiTitleStyle == null)
         {
-            uiTitleStyle = new GUIStyle(GUI.skin.label);
+            uiTitleStyle = new GUIStyle();
             uiTitleStyle.fontSize = 14;
             uiTitleStyle.fontStyle = FontStyle.Bold;
             uiTitleStyle.normal.textColor = Color.white;
@@ -546,7 +553,7 @@ public class AUV : MonoBehaviour
 
         if (uiTextStyle == null)
         {
-            uiTextStyle = new GUIStyle(GUI.skin.label);
+            uiTextStyle = new GUIStyle();
             uiTextStyle.fontSize = 12;
             uiTextStyle.alignment = TextAnchor.UpperLeft;
             uiTextStyle.wordWrap = true;
