@@ -6,14 +6,12 @@ using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 
-// DTO for input request
 public class ApiRequest
 {
     public string request;
     public Dictionary<string, object> values;
 }
 
-// DTO for output request
 public class ApiResponse
 {
     public int status;
@@ -27,16 +25,15 @@ public class ServerRuntime
     private UdpClient _udpClient;
     private CancellationTokenSource _cts;
 
-    // Command registry (router)
-    private readonly Dictionary<string, Func<Dictionary<string, object>, (int code, string msg, object res)>> _commands
-        = new Dictionary<string, Func<Dictionary<string, object>, (int code, string msg, object res)>>();
+    private readonly Dictionary<string, Func<Dictionary<string, object>, Task<(int code, string msg, object res)>>> _commands
+        = new Dictionary<string, Func<Dictionary<string, object>, Task<(int code, string msg, object res)>>>();
 
     public ServerRuntime(int port)
     {
         _port = port;
     }
 
-    public void AddRequest(string name, Func<Dictionary<string, object>, (int code, string msg, object res)> logic)
+    public void AddRequest(string name, Func<Dictionary<string, object>, Task<(int code, string msg, object res)>> logic)
     {
         _commands[name] = logic;
     }
@@ -45,9 +42,9 @@ public class ServerRuntime
     {
         _udpClient = new UdpClient(_port);
         _cts = new CancellationTokenSource();
-
         _ = ReceiveLoopAsync(_cts.Token);
     }
+
     public void Stop()
     {
         _cts?.Cancel();
@@ -56,32 +53,39 @@ public class ServerRuntime
 
     private async Task ReceiveLoopAsync(CancellationToken token)
     {
-        try
+        while (!token.IsCancellationRequested)
         {
-            while (!token.IsCancellationRequested)
+            try
             {
-                UdpReceiveResult receiveResult = await _udpClient.ReceiveAsync();
-
-                _ = Task.Run(() => ProcessPacketAsync(receiveResult), token);
+                var result = await _udpClient.ReceiveAsync();
+                _ = ProcessPacketAsync(result);
+            }
+            catch (ObjectDisposedException) { break; }
+            catch (SocketException ex)
+            {
+                // Игнорируем ошибку 10054 (клиент закрыл соединение)
+                if (ex.NativeErrorCode != 10054)
+                    UnityEngine.Debug.LogError($"UDP Receive Error: {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                UnityEngine.Debug.LogError($"UDP Loop Error: {ex.Message}");
             }
         }
-        catch (ObjectDisposedException) { }
-        catch (Exception e) { UnityEngine.Debug.LogError($"UDP Server Loop Error: {e.Message}"); }
     }
 
     private async Task ProcessPacketAsync(UdpReceiveResult receiveResult)
     {
-        string jsonString = Encoding.UTF8.GetString(receiveResult.Buffer);
-        ApiResponse response = new ApiResponse();
-
+        var response = new ApiResponse();
         try
         {
-            ApiRequest req = JsonConvert.DeserializeObject<ApiRequest>(jsonString);
+            string json = Encoding.UTF8.GetString(receiveResult.Buffer);
+            var req = JsonConvert.DeserializeObject<ApiRequest>(json);
 
-            if (req == null || string.IsNullOrEmpty(req.request) || req.values == null)
+            if (req == null || string.IsNullOrEmpty(req.request))
             {
                 response.status = 400;
-                response.message = "Bad Request: Missing 'request' or 'values'";
+                response.message = "Invalid Request Format";
             }
             else
             {
@@ -89,8 +93,8 @@ public class ServerRuntime
                 {
                     try
                     {
-                        var (code, msg, res) = executeLogic.Invoke(req.values);
-
+                        // ОБНОВЛЕНО: Теперь мы ждем (await) выполнения команды
+                        var (code, msg, res) = await executeLogic.Invoke(req.values);
                         response.status = code;
                         response.message = msg;
                         response.result = res;
