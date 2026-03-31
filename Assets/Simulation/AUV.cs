@@ -11,9 +11,10 @@ public class AUV : MonoBehaviour
     private const float DefaultMaxYawControlTorque = 705.23f;
     private const float MBESOriginOffset = 0.05f;
     private const int MBESTextureHeight = 24;
-    private static readonly Color MBESNearColor = new Color(0.82f, 0.92f, 1f, 1f);
-    private static readonly Color MBESFarColor = new Color(0.24f, 0.34f, 0.45f, 1f);
-    private static readonly Color MBESMissColor = new Color(0.16f, 0.22f, 0.28f, 1f);
+    private const float MBESMinVisibleContrastRange = 2f;
+    private static readonly Color MBESNearColor = new Color(0.98f, 0.98f, 0.96f, 1f);
+    private static readonly Color MBESFarColor = new Color(0.24f, 0.32f, 0.4f, 1f);
+    private static readonly Color MBESMissColor = new Color(0.1f, 0.13f, 0.17f, 1f);
 
     // ID
     protected static int nextid = 0;
@@ -108,6 +109,7 @@ public class AUV : MonoBehaviour
             );
         }
         Motors = tmp_motorForcePoints.ToArray();
+        BalanceMotorForcePoints();
 
         // Расчет отношения для диапозона
         ForceRatio = auvSettings.MaxPower / 100f;
@@ -250,6 +252,129 @@ public class AUV : MonoBehaviour
         {
             rb.AddRelativeTorque(new Vector3(0f, YawControlTorque, 0f), ForceMode.Force);
         }
+    }
+
+    private void BalanceMotorForcePoints()
+    {
+        if (rb == null || Motors.Length == 0)
+        {
+            return;
+        }
+
+        bool hasForwardGroup = false;
+        bool hasVerticalGroup = false;
+
+        float forwardAverageY = 0f;
+        float forwardAverageZ = 0f;
+        int forwardCount = 0;
+
+        float verticalAverageX = 0f;
+        float verticalAverageZ = 0f;
+        int verticalCount = 0;
+
+        for (int i = 0; i < Motors.Length; i++)
+        {
+            Vector3 direction = NormalizeDirection(Motors[i].inf.localDirection, Vector3.forward);
+            int dominantAxis = GetDominantAxis(direction);
+            Vector3 point = Motors[i].inf.localPoint;
+
+            if (dominantAxis == 0)
+            {
+                hasForwardGroup = true;
+                forwardAverageY += point.y;
+                forwardAverageZ += point.z;
+                forwardCount++;
+            }
+            else if (dominantAxis == 1)
+            {
+                hasVerticalGroup = true;
+                verticalAverageX += point.x;
+                verticalAverageZ += point.z;
+                verticalCount++;
+            }
+        }
+
+        if (forwardCount > 0)
+        {
+            forwardAverageY /= forwardCount;
+            forwardAverageZ /= forwardCount;
+        }
+
+        if (verticalCount > 0)
+        {
+            verticalAverageX /= verticalCount;
+            verticalAverageZ /= verticalCount;
+        }
+
+        Vector3 balancedCenterOfMass = rb.centerOfMass;
+        if (hasVerticalGroup)
+        {
+            balancedCenterOfMass.x = verticalAverageX;
+        }
+
+        if (hasForwardGroup)
+        {
+            balancedCenterOfMass.y = forwardAverageY;
+        }
+
+        float balancedZ = 0f;
+        int balancedZContributors = 0;
+        if (hasForwardGroup)
+        {
+            balancedZ += forwardAverageZ;
+            balancedZContributors++;
+        }
+
+        if (hasVerticalGroup)
+        {
+            balancedZ += verticalAverageZ;
+            balancedZContributors++;
+        }
+
+        if (balancedZContributors > 0)
+        {
+            balancedCenterOfMass.z = balancedZ / balancedZContributors;
+        }
+
+        rb.centerOfMass = balancedCenterOfMass;
+
+        for (int i = 0; i < Motors.Length; i++)
+        {
+            Vector3 direction = NormalizeDirection(Motors[i].inf.localDirection, Vector3.forward);
+            int dominantAxis = GetDominantAxis(direction);
+            AUVSettings.ForcePoint forcePoint = Motors[i].inf;
+            Vector3 point = forcePoint.localPoint;
+
+            if (dominantAxis == 0 && forwardCount > 0)
+            {
+                point.y = balancedCenterOfMass.y;
+                point.z = balancedCenterOfMass.z + (point.z - forwardAverageZ);
+            }
+            else if (dominantAxis == 1 && verticalCount > 0)
+            {
+                point.x = balancedCenterOfMass.x + (point.x - verticalAverageX);
+                point.z = balancedCenterOfMass.z + (point.z - verticalAverageZ);
+            }
+
+            forcePoint.localPoint = point;
+            Motors[i].inf = forcePoint;
+        }
+    }
+
+    private static int GetDominantAxis(Vector3 direction)
+    {
+        Vector3 absoluteDirection = new Vector3(Mathf.Abs(direction.x), Mathf.Abs(direction.y), Mathf.Abs(direction.z));
+        if (absoluteDirection.x >= absoluteDirection.y && absoluteDirection.x >= absoluteDirection.z)
+        {
+            return 0;
+        }
+
+        if (absoluteDirection.y >= absoluteDirection.z)
+        {
+            return 1;
+        }
+
+        return 2;
     }
 
     // === MBES ===
@@ -460,12 +585,30 @@ public class AUV : MonoBehaviour
             mbesTexturePixels = new Color[textureWidth * textureHeight];
         }
 
+        float visibleMinRange = mbesNearestHitRange;
+        float visibleMaxRange = mbesFarthestHitRange;
+        if (mbesHitCount > 0)
+        {
+            float visibleRange = visibleMaxRange - visibleMinRange;
+            if (visibleRange < MBESMinVisibleContrastRange)
+            {
+                float centerRange = (visibleMinRange + visibleMaxRange) * 0.5f;
+                visibleMinRange = Mathf.Max(0f, centerRange - (MBESMinVisibleContrastRange * 0.5f));
+                visibleMaxRange = visibleMinRange + MBESMinVisibleContrastRange;
+            }
+        }
+
         for (int x = 0; x < textureWidth; x++)
         {
-            float distanceRatio = Mathf.InverseLerp(0f, mbesMaxRange, mbesHits[x].range);
-            Color beamColor = mbesHits[x].hasHit
-                ? Color.Lerp(MBESNearColor, MBESFarColor, distanceRatio)
-                : MBESMissColor;
+            Color beamColor = MBESMissColor;
+            if (mbesHits[x].hasHit)
+            {
+                float distanceRatio = mbesHitCount > 0
+                    ? Mathf.InverseLerp(visibleMinRange, visibleMaxRange, mbesHits[x].range)
+                    : Mathf.InverseLerp(0f, mbesMaxRange, mbesHits[x].range);
+                distanceRatio = Mathf.Pow(Mathf.Clamp01(distanceRatio), 0.8f);
+                beamColor = Color.Lerp(MBESNearColor, MBESFarColor, distanceRatio);
+            }
 
             for (int y = 0; y < textureHeight; y++)
             {
