@@ -92,18 +92,22 @@ public class AUVAPIController : MonoBehaviour
             {
                 auvById.Add(auv.id, auv);
             }
+            else
+            {
+                Debug.LogWarning($"Duplicate AUV id detected: {auv.id}. Only the first instance will be used by AUVAPIController.");
+            }
         }
     }
 
     // Находит AUV по id, при необходимости обновляет кэш
     private bool TryGetAUV(int auvId, out AUV auv)
     {
-        if (auvById.TryGetValue(auvId, out auv))
+        if (auvById.TryGetValue(auvId, out auv) && auv != null)
         {
             return true;
         }
 
         RefreshAUVCache();
-        return auvById.TryGetValue(auvId, out auv);
+        return auvById.TryGetValue(auvId, out auv) && auv != null;
     }
 }

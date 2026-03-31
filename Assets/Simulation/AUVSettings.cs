@@ -4,7 +4,7 @@ using UnityEngine;
 // Общие настройки для всех AUV в сцене
 public class AUVSettings : MonoBehaviour
 {
-    private const float DefaultMaxPower = 100f;
+    private const float DefaultMaxPower = 1000f;
 
     // === Структуры данных ===
     [Serializable]
@@ -19,6 +19,13 @@ public class AUVSettings : MonoBehaviour
     [Header("Motors")]
     [SerializeField] private float maxPower = DefaultMaxPower;
     [SerializeField] private ForcePoint[] forcePoints = CreateDefaultForcePoints();
+
+    [Header("MBES")]
+    [SerializeField] public int MBESPointsCount = 1024; // количество точек
+    [SerializeField] public int MBESDistance = 80; // ширина в метрах
+    [SerializeField] public float MBESMaxRange = 200f; // максимальная длина луча
+    [SerializeField] public Transform MBESPoint; // точка для MBED
+    
 
     // === Переменные класса ===
     private static AUVSettings shared;

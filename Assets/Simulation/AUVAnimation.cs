@@ -1,7 +1,9 @@
+using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 // Визуальная анимация пропеллеров AUV на основе текущих команд моторов
-[RequireComponent(typeof(AUV))]
+[RequireComponent(typeof(AUV), typeof(AUVAnimationSettings))]
 public class AUVAnimation : MonoBehaviour
 {
     // === Unity параметры ===
@@ -27,6 +29,10 @@ public class AUVAnimation : MonoBehaviour
     private const string TopRearPartName = "Properell4";
     private const string SideLeftPartName = "Properell1";
     private const string SideRightPartName = "Properell3";
+    private static readonly string[] MotorNameTokens = { "properell", "propeller", "thruster", "motor" };
+
+    private bool missingSetupLogged = false;
+    private bool missingPartsLogged = false;
 
     // === Unity жизненный цикл ===
 
@@ -49,7 +55,29 @@ public class AUVAnimation : MonoBehaviour
     {
         if (auv == null || animationSettings == null)
         {
+            if (!missingSetupLogged)
+            {
+                Debug.LogWarning("AUVAnimation: AUV or AUVAnimationSettings is missing. Animation is disabled.", this);
+                missingSetupLogged = true;
+            }
+
             return;
+        }
+
+        missingSetupLogged = false;
+
+        if (topFrontMotorPart == null || topRearMotorPart == null || sideLeftMotorPart == null || sideRightMotorPart == null)
+        {
+            AutoAssignPartsIfNeeded();
+            if (!missingPartsLogged && (topFrontMotorPart == null || topRearMotorPart == null || sideLeftMotorPart == null || sideRightMotorPart == null))
+            {
+                Debug.LogWarning("AUVAnimation: One or more motor parts are not assigned. Run ObjPartsLogger and bind transforms in Inspector.", this);
+                missingPartsLogged = true;
+            }
+        }
+        else
+        {
+            missingPartsLogged = false;
         }
 
         AnimateMotor(topFrontMotorPart, animationSettings.TopFrontMotorId, topMotorsAxis, invertTopMotors);
@@ -71,6 +99,11 @@ public class AUVAnimation : MonoBehaviour
         if (animationSettings == null)
         {
             animationSettings = GetComponent<AUVAnimationSettings>();
+        }
+
+        if (animationSettings == null)
+        {
+            animationSettings = gameObject.AddComponent<AUVAnimationSettings>();
         }
     }
 
@@ -95,6 +128,19 @@ public class AUVAnimation : MonoBehaviour
         if (sideRightMotorPart == null)
         {
             sideRightMotorPart = FindChildRecursive(transform, SideRightPartName);
+        }
+
+        if (topFrontMotorPart == null || topRearMotorPart == null || sideLeftMotorPart == null || sideRightMotorPart == null)
+        {
+            List<Transform> candidates = new List<Transform>();
+            CollectMotorCandidates(transform, candidates);
+            candidates.Sort((a, b) => string.Compare(a.name, b.name, StringComparison.OrdinalIgnoreCase));
+
+            int index = 0;
+            if (topFrontMotorPart == null && index < candidates.Count) topFrontMotorPart = candidates[index++];
+            if (topRearMotorPart == null && index < candidates.Count) topRearMotorPart = candidates[index++];
+            if (sideLeftMotorPart == null && index < candidates.Count) sideLeftMotorPart = candidates[index++];
+            if (sideRightMotorPart == null && index < candidates.Count) sideRightMotorPart = candidates[index++];
         }
     }
 
@@ -146,5 +192,30 @@ public class AUVAnimation : MonoBehaviour
         }
 
         return null;
+    }
+
+    private static void CollectMotorCandidates(Transform root, List<Transform> output)
+    {
+        if (root == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < root.childCount; i++)
+        {
+            Transform child = root.GetChild(i);
+            string childName = child.name.ToLowerInvariant();
+
+            for (int tokenIndex = 0; tokenIndex < MotorNameTokens.Length; tokenIndex++)
+            {
+                if (childName.Contains(MotorNameTokens[tokenIndex]))
+                {
+                    output.Add(child);
+                    break;
+                }
+            }
+
+            CollectMotorCandidates(child, output);
+        }
     }
 }
