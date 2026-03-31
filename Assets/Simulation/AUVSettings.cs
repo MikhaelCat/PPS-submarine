@@ -5,6 +5,11 @@ using UnityEngine;
 public class AUVSettings : MonoBehaviour
 {
     private const float DefaultMaxPower = 1000f;
+    private const int DefaultMBESPointsCount = 1024;
+    private const int DefaultMBESDistance = 80;
+    private const float DefaultMBESMaxRange = 200f;
+    private static readonly Vector3 DefaultMBESLookDirection = Vector3.down;
+    private static readonly Vector3 DefaultMBESSpanDirection = Vector3.right;
 
     // === Структуры данных ===
     [Serializable]
@@ -21,10 +26,12 @@ public class AUVSettings : MonoBehaviour
     [SerializeField] private ForcePoint[] forcePoints = CreateDefaultForcePoints();
 
     [Header("MBES")]
-    [SerializeField] public int MBESPointsCount = 1024; // количество точек
-    [SerializeField] public int MBESDistance = 80; // ширина в метрах
+    [SerializeField] public int MBESPointsCount = DefaultMBESPointsCount; // количество точек
+    [SerializeField] public int MBESDistance = DefaultMBESDistance; // ширина в метрах
     [SerializeField] public float MBESMaxRange = 200f; // максимальная длина луча
     [SerializeField] public Transform MBESPoint; // точка для MBED
+    [SerializeField] public Vector3 MBESLookDirection = new Vector3(0f, -1f, 0f); // куда смотрит центральный луч в локальных координатах MBESPoint
+    [SerializeField] public Vector3 MBESSpanDirection = new Vector3(1f, 0f, 0f); // вдоль какой оси строится полоса в локальных координатах MBESPoint
     
 
     // === Переменные класса ===
@@ -77,12 +84,39 @@ public class AUVSettings : MonoBehaviour
         {
             forcePoints = CreateDefaultForcePoints();
         }
+
+        if (MBESPointsCount < 2)
+        {
+            MBESPointsCount = DefaultMBESPointsCount;
+        }
+
+        MBESDistance = Mathf.Clamp(MBESDistance, 1, 100);
+
+        if (MBESMaxRange <= 0f)
+        {
+            MBESMaxRange = DefaultMBESMaxRange;
+        }
+
+        if (MBESLookDirection.sqrMagnitude < 0.0001f)
+        {
+            MBESLookDirection = DefaultMBESLookDirection;
+        }
+
+        if (MBESSpanDirection.sqrMagnitude < 0.0001f)
+        {
+            MBESSpanDirection = DefaultMBESSpanDirection;
+        }
     }
 
     private void Reset()
     {
         maxPower = DefaultMaxPower;
         forcePoints = CreateDefaultForcePoints();
+        MBESPointsCount = DefaultMBESPointsCount;
+        MBESDistance = DefaultMBESDistance;
+        MBESMaxRange = DefaultMBESMaxRange;
+        MBESLookDirection = DefaultMBESLookDirection;
+        MBESSpanDirection = DefaultMBESSpanDirection;
     }
 
     // Регистрирует общий экземпляр настроек
