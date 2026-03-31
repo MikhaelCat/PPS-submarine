@@ -65,7 +65,7 @@ public class AUVControllerManager : MonoBehaviour
         new IdAndForce { MotorId = 3, Force = 100f },
         new IdAndForce { MotorId = 4, Force = -100f },
     };
-    
+
     // Флаг включения ручного управления
     [System.NonSerialized]
     public bool Included;
@@ -85,6 +85,7 @@ public class AUVControllerManager : MonoBehaviour
 
     private AUV[] controlledAUVs = System.Array.Empty<AUV>();
     private int currentAuvIndex = -1;
+    private int currentAuvId = -1;
 
     private static List<IdAndForce> CreateForwardMove()
     {
@@ -270,10 +271,18 @@ public class AUVControllerManager : MonoBehaviour
     // Главный цикл ручного управления
     void Update()
     {
+        bool hadAuvBeforeUpdate = currentAuvId >= 0;
         if (!TryGetCurrentAUV(out AUV currentAuv))
         {
+            if (hadAuvBeforeUpdate)
+            {
+                SetOrbitTargetToCurrentAUV();
+            }
+
             return;
         }
+
+        SyncOrbitTarget(currentAuv);
 
         if (!Included)
         {
@@ -371,10 +380,21 @@ public class AUVControllerManager : MonoBehaviour
     // Обновляет кэш доступных AUV
     private void RefreshAUVs()
     {
+        int previousAuvId = currentAuvId;
+        if (previousAuvId < 0
+            && controlledAUVs != null
+            && currentAuvIndex >= 0
+            && currentAuvIndex < controlledAUVs.Length
+            && controlledAUVs[currentAuvIndex] != null)
+        {
+            previousAuvId = controlledAUVs[currentAuvIndex].id;
+        }
+
         controlledAUVs = GetAUVs();
         if (controlledAUVs.Length == 0)
         {
             currentAuvIndex = -1;
+            currentAuvId = -1;
             if (OrbitCamera != null)
             {
                 OrbitCamera.SetTarget(null, false);
@@ -382,10 +402,29 @@ public class AUVControllerManager : MonoBehaviour
             return;
         }
 
-        if (currentAuvIndex < 0 || currentAuvIndex >= controlledAUVs.Length)
+        int nextIndex = -1;
+        if (previousAuvId >= 0)
+        {
+            for (int i = 0; i < controlledAUVs.Length; i++)
+            {
+                if (controlledAUVs[i] != null && controlledAUVs[i].id == previousAuvId)
+                {
+                    nextIndex = i;
+                    break;
+                }
+            }
+        }
+
+        if (nextIndex >= 0)
+        {
+            currentAuvIndex = nextIndex;
+        }
+        else if (currentAuvIndex < 0 || currentAuvIndex >= controlledAUVs.Length)
         {
             currentAuvIndex = 0;
         }
+
+        currentAuvId = controlledAUVs[currentAuvIndex] != null ? controlledAUVs[currentAuvIndex].id : -1;
     }
 
     // Переключает управление на следующий AUV
@@ -398,6 +437,7 @@ public class AUVControllerManager : MonoBehaviour
         }
 
         currentAuvIndex = (currentAuvIndex + 1) % controlledAUVs.Length;
+        currentAuvId = controlledAUVs[currentAuvIndex] != null ? controlledAUVs[currentAuvIndex].id : -1;
         SetOrbitTargetToCurrentAUV();
     }
 
@@ -425,16 +465,40 @@ public class AUVControllerManager : MonoBehaviour
         currentAuv = null;
         if (controlledAUVs == null || controlledAUVs.Length == 0)
         {
-            return false;
+            RefreshAUVs();
+            if (controlledAUVs == null || controlledAUVs.Length == 0)
+            {
+                return false;
+            }
         }
 
-        if (currentAuvIndex < 0 || currentAuvIndex >= controlledAUVs.Length)
+        if (currentAuvIndex < 0 || currentAuvIndex >= controlledAUVs.Length || controlledAUVs[currentAuvIndex] == null)
         {
-            currentAuvIndex = 0;
+            RefreshAUVs();
+            if (controlledAUVs == null || controlledAUVs.Length == 0)
+            {
+                return false;
+            }
         }
 
         currentAuv = controlledAUVs[currentAuvIndex];
-        return currentAuv != null;
+        if (currentAuv == null)
+        {
+            RefreshAUVs();
+            if (controlledAUVs == null || controlledAUVs.Length == 0)
+            {
+                return false;
+            }
+
+            currentAuv = controlledAUVs[currentAuvIndex];
+            if (currentAuv == null)
+            {
+                return false;
+            }
+        }
+
+        currentAuvId = currentAuv.id;
+        return true;
     }
 
     // === Обработка действий управления ===
@@ -567,6 +631,19 @@ public class AUVControllerManager : MonoBehaviour
 
         AddActionForces(PitchMove, targetForces);
         return true;
+    }
+
+    private void SyncOrbitTarget(AUV currentAuv)
+    {
+        if (OrbitCamera == null)
+        {
+            return;
+        }
+
+        if (OrbitCamera.target != currentAuv.transform)
+        {
+            OrbitCamera.SetTarget(currentAuv.transform, true);
+        }
     }
 
     // === Вспомогательные функции ===
