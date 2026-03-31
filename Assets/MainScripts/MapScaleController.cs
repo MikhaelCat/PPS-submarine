@@ -4,7 +4,11 @@ using System.Collections.Generic;
 
 public class MapScaleController : MonoBehaviour
 {
-    public Transform mapContainer;
+    public Transform mapContainer; // Объект карты в редакторе
+
+    // СТАТИЧЕСКАЯ ПЕРЕМЕННАЯ: хранит масштаб для всех сцен. 
+    // По умолчанию 1.0f (соответствует 1000x1000)
+    public static float GlobalScaleFactor = 1.0f;
 
     [Header("Настройки цветов")]
     public Color normalColor = Color.white;
@@ -14,10 +18,11 @@ public class MapScaleController : MonoBehaviour
 
     void Start()
     {
-        // По умолчанию 1000
+        // При старте подсвечиваем кнопку, соответствующую текущему GlobalScaleFactor
+        float currentScaleInUnits = GlobalScaleFactor * 1000f;
         foreach (Button btn in scaleButtons)
         {
-            if (btn != null && btn.gameObject.name == "1000")
+            if (btn != null && btn.gameObject.name == currentScaleInUnits.ToString())
             {
                 SetMapScale(btn);
                 break;
@@ -29,39 +34,35 @@ public class MapScaleController : MonoBehaviour
     {
         if (clickedButton == null) return;
 
+        // Визуальное переключение кнопок
         foreach (Button btn in scaleButtons)
         {
             if (btn != null)
             {
-                // Сбрасываем и цвет картинки, и настройки состояний кнопки
                 btn.image.color = normalColor;
                 var cb = btn.colors;
                 cb.normalColor = normalColor;
-                cb.selectedColor = normalColor; // Чтобы при потере фокуса не горела
                 btn.colors = cb;
             }
         }
 
-        // Фиксируем выделение на нажатой кнопке
         clickedButton.image.color = selectedColor;
         var clickedCb = clickedButton.colors;
         clickedCb.normalColor = selectedColor;
-        clickedCb.selectedColor = selectedColor;
         clickedButton.colors = clickedCb;
 
-        // 1. УДАЛЕНИЕ СТАРЫХ ТОЧЕК
-        // Убедитесь, что у вашего префаба RedDot стоит тег "Marker"
+        // Удаление старых точек при смене масштаба
         GameObject[] oldMarkers = GameObject.FindGameObjectsWithTag("Marker");
         foreach (var m in oldMarkers) Destroy(m);
 
-        // 2. МАСШТАБИРОВАНИЕ 3D (X и Z)
+        // МАСШТАБИРОВАНИЕ
         if (float.TryParse(clickedButton.gameObject.name, out float value))
         {
-            float scaleFactor = value / 1000f;
+            GlobalScaleFactor = value / 1000f; // Сохраняем в статическую память
+
             if (mapContainer != null)
             {
-                // Y оставляем без изменений (например, 1.0f)
-                mapContainer.localScale = new Vector3(scaleFactor, mapContainer.localScale.y, scaleFactor);
+                mapContainer.localScale = new Vector3(GlobalScaleFactor, mapContainer.localScale.y, GlobalScaleFactor);
             }
         }
     }
