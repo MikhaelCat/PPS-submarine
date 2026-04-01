@@ -147,7 +147,6 @@ public class AUV : MonoBehaviour
     private void FixedUpdate()
     {
         ApllyMotorForce();
-        ApplyControlTorque();
         MBESUpdate();
     }
 
@@ -223,11 +222,6 @@ public class AUV : MonoBehaviour
         return true;
     }
 
-    public void SetYawControlPercent(float percent)
-    {
-        float clampedPercent = Mathf.Clamp(percent, -100f, 100f);
-        YawControlTorque = maxYawControlTorque * (clampedPercent / 100f);
-    }
 
     public void ApllyMotorForce()
     {
@@ -246,13 +240,6 @@ public class AUV : MonoBehaviour
         }
     }
 
-    private void ApplyControlTorque()
-    {
-        if (!Mathf.Approximately(YawControlTorque, 0f))
-        {
-            rb.AddRelativeTorque(new Vector3(0f, YawControlTorque, 0f), ForceMode.Force);
-        }
-    }
 
     private void BalanceMotorForcePoints()
     {
