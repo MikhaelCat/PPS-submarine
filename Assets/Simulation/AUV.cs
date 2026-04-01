@@ -8,7 +8,6 @@ using UnityEngine;
 public class AUV : MonoBehaviour
 {
     private static readonly Vector3 DefaultInertiaTensor = new Vector3(3333.3333f, 1666.6666f, 3333.3333f);
-    private const float DefaultMaxYawControlTorque = 705.23f;
     private const float MBESOriginOffset = 0.05f;
     private const int MBESTextureHeight = 24;
     private const float MBESMinVisibleContrastRange = 2f;
@@ -25,7 +24,7 @@ public class AUV : MonoBehaviour
     [SerializeField] bool applyLegacyInertiaTensor = true;
     [SerializeField] Vector3 inertiaTensor = new Vector3(3333.3333f, 1666.6666f, 3333.3333f);
     [SerializeField] bool useMotorForcePoints = true;
-    [SerializeField] float maxYawControlTorque = DefaultMaxYawControlTorque;
+
 
     [Header("UI")]
     [SerializeField] bool UIOn = false;
@@ -135,7 +134,6 @@ public class AUV : MonoBehaviour
         applyLegacyInertiaTensor = true;
         inertiaTensor = DefaultInertiaTensor;
         useMotorForcePoints = true;
-        maxYawControlTorque = DefaultMaxYawControlTorque;
     }
 
     private void Awake()
