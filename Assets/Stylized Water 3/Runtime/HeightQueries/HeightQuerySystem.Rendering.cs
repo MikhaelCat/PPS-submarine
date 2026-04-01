@@ -120,9 +120,11 @@ namespace StylizedWater3
                 }
             }
 
+            #if !UNITY_6000_0_OR_NEWER
             #pragma warning disable CS0672
             public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData) { }
             #pragma warning restore CS0672
+            #endif
    
             public void Dispose()
             {
