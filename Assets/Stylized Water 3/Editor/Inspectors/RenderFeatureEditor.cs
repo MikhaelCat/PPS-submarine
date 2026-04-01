@@ -53,10 +53,9 @@ namespace StylizedWater3
             }
             EditorGUILayout.Space();
             
-            UI.DrawNotification(PipelineUtilities.RenderGraphEnabled() == false, "Render Graph is disabled, functionality on this render feature will not be functional", "Enable", () =>
+            UI.DrawNotification(PipelineUtilities.RenderGraphEnabled() == false, "Render Graph is disabled, functionality on this render feature will not be functional", "Open settings", () =>
             {
-                UnityEngine.Rendering.Universal.RenderGraphSettings settings = UnityEngine.Rendering.GraphicsSettings.GetRenderPipelineSettings<UnityEngine.Rendering.Universal.RenderGraphSettings>();
-                settings.enableRenderCompatibilityMode = false;
+                SettingsService.OpenProjectSettings("Project/Graphics");
             }, MessageType.Error);
 
             serializedObject.Update();

@@ -119,7 +119,8 @@ namespace StylizedWater3
             }
         }
         
-        //Non-RG fallback
+        //Non-RG fallback for pre-Unity 6 pipelines
+        #if !UNITY_6000_0_OR_NEWER
         #pragma warning disable CS0672
         public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
         {
@@ -146,8 +147,13 @@ namespace StylizedWater3
             CommandBufferPool.Release(cmd);
         }
         #pragma warning restore CS0672
+        #endif
 
+        #if UNITY_6000_0_OR_NEWER
+        public override void OnCameraCleanup(CommandBuffer cmd)
+        #else
         public override void FrameCleanup(CommandBuffer cmd)
+        #endif
         {
             cmd.SetGlobalInt(_CausticsProjectionAvailable, 0);
             cmd.SetGlobalInt(_WaterSSRAllowed, 0);
