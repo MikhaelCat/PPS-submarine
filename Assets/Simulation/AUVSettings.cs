@@ -10,6 +10,14 @@ public class AUVSettings : MonoBehaviour
     private const float DefaultMBESMaxRange = 200f;
     private static readonly Vector3 DefaultMBESLookDirection = Vector3.down;
     private static readonly Vector3 DefaultMBESSpanDirection = Vector3.right;
+    private const int DefaultCameraWidth = 512;
+    private const int DefaultCameraHeight = 512;
+    private const float DefaultCameraAspect = 1f;
+    private const bool DefaultCameraOrthographic = true;
+    private const float DefaultCameraOrthographicSize = 2f;
+    private const float DefaultCameraFieldOfView = 60f;
+    private const float DefaultCameraNearClipPlane = 0.3f;
+    private const float DefaultCameraFarClipPlane = 100f;
 
     // === Структуры данных ===
     [Serializable]
@@ -18,6 +26,45 @@ public class AUVSettings : MonoBehaviour
         [SerializeField] public int id;
         [SerializeField] public Vector3 localPoint;
         [SerializeField] public Vector3 localDirection;
+    }
+
+    [Serializable]
+    public struct SensorCameraSettings
+    {
+        public int width;
+        public int height;
+        public int depthBufferBits;
+        public RenderTextureFormat renderTextureFormat;
+        public float aspect;
+        public bool orthographic;
+        public float orthographicSize;
+        public float fieldOfView;
+        public float nearClipPlane;
+        public float farClipPlane;
+
+        public SensorCameraSettings(
+            int width,
+            int height,
+            int depthBufferBits,
+            RenderTextureFormat renderTextureFormat,
+            float aspect,
+            bool orthographic,
+            float orthographicSize,
+            float fieldOfView,
+            float nearClipPlane,
+            float farClipPlane)
+        {
+            this.width = width;
+            this.height = height;
+            this.depthBufferBits = depthBufferBits;
+            this.renderTextureFormat = renderTextureFormat;
+            this.aspect = aspect;
+            this.orthographic = orthographic;
+            this.orthographicSize = orthographicSize;
+            this.fieldOfView = fieldOfView;
+            this.nearClipPlane = nearClipPlane;
+            this.farClipPlane = farClipPlane;
+        }
     }
     
     // === Unity параметры ===
@@ -33,6 +80,22 @@ public class AUVSettings : MonoBehaviour
     [SerializeField] public Vector3 MBESLookDirection = new Vector3(0f, -1f, 0f); // куда смотрит центральный луч в локальных координатах MBESPoint
     [SerializeField] public Vector3 MBESSpanDirection = new Vector3(1f, 0f, 0f); // вдоль какой оси строится полоса в локальных координатах MBESPoint
     
+    [Header("Camera")]
+    [SerializeField] private int cameraWidth = DefaultCameraWidth;
+    [SerializeField] private int cameraHeight = DefaultCameraHeight;
+    [SerializeField] private int cameraDepthBufferBits = 24;
+    [SerializeField] private RenderTextureFormat cameraRenderTextureFormat = RenderTextureFormat.ARGB32;
+    [SerializeField] private float cameraAspect = DefaultCameraAspect;
+    [SerializeField] private bool cameraOrthographic = DefaultCameraOrthographic;
+    [SerializeField] private float cameraOrthographicSize = DefaultCameraOrthographicSize;
+    [SerializeField] private float cameraFieldOfView = DefaultCameraFieldOfView;
+    [SerializeField] private float cameraNearClipPlane = DefaultCameraNearClipPlane;
+    [SerializeField] private float cameraFarClipPlane = DefaultCameraFarClipPlane;
+    
+    [Header("Sonar #1")]
+    // сонар первый
+    [Header("Sonar #2")]
+    // сонар второй
 
     // === Переменные класса ===
     private static AUVSettings shared;
@@ -41,6 +104,46 @@ public class AUVSettings : MonoBehaviour
     // Публичные свойства для чтения параметров
     public float MaxPower => maxPower;
     public ForcePoint[] ForcePoints => forcePoints ?? Array.Empty<ForcePoint>();
+    public int CameraWidth => cameraWidth;
+    public int CameraHeight => cameraHeight;
+    public int CameraDepthBufferBits => cameraDepthBufferBits;
+    public RenderTextureFormat CameraRenderTextureFormat => cameraRenderTextureFormat;
+    public float CameraAspect => cameraAspect;
+    public bool CameraOrthographic => cameraOrthographic;
+    public float CameraOrthographicSize => cameraOrthographicSize;
+    public float CameraFieldOfView => cameraFieldOfView;
+    public float CameraNearClipPlane => cameraNearClipPlane;
+    public float CameraFarClipPlane => cameraFarClipPlane;
+
+    public SensorCameraSettings GetSensorCameraSettings()
+    {
+        return new SensorCameraSettings(
+            cameraWidth,
+            cameraHeight,
+            cameraDepthBufferBits,
+            cameraRenderTextureFormat,
+            cameraAspect,
+            cameraOrthographic,
+            cameraOrthographicSize,
+            cameraFieldOfView,
+            cameraNearClipPlane,
+            cameraFarClipPlane);
+    }
+
+    public RenderTexture CreateSensorRenderTexture(string textureName = null)
+    {
+        SensorCameraSettings cameraSettings = GetSensorCameraSettings();
+        RenderTexture renderTexture = new RenderTexture(
+            cameraSettings.width,
+            cameraSettings.height,
+            cameraSettings.depthBufferBits,
+            cameraSettings.renderTextureFormat)
+        {
+            name = string.IsNullOrWhiteSpace(textureName) ? "AUVSensorRT" : textureName
+        };
+        renderTexture.Create();
+        return renderTexture;
+    }
 
     private static ForcePoint[] CreateDefaultForcePoints()
     {
@@ -106,6 +209,32 @@ public class AUVSettings : MonoBehaviour
         {
             MBESSpanDirection = DefaultMBESSpanDirection;
         }
+
+        cameraWidth = Mathf.Max(16, cameraWidth);
+        cameraHeight = Mathf.Max(16, cameraHeight);
+        cameraDepthBufferBits = Mathf.Max(0, cameraDepthBufferBits);
+
+        if (cameraAspect <= 0f)
+        {
+            cameraAspect = DefaultCameraAspect;
+        }
+
+        if (cameraOrthographicSize <= 0f)
+        {
+            cameraOrthographicSize = DefaultCameraOrthographicSize;
+        }
+
+        cameraFieldOfView = Mathf.Clamp(cameraFieldOfView, 1f, 179f);
+
+        if (cameraNearClipPlane <= 0f)
+        {
+            cameraNearClipPlane = DefaultCameraNearClipPlane;
+        }
+
+        if (cameraFarClipPlane <= cameraNearClipPlane)
+        {
+            cameraFarClipPlane = Mathf.Max(DefaultCameraFarClipPlane, cameraNearClipPlane + 0.1f);
+        }
     }
 
     private void Reset()
@@ -117,6 +246,16 @@ public class AUVSettings : MonoBehaviour
         MBESMaxRange = DefaultMBESMaxRange;
         MBESLookDirection = DefaultMBESLookDirection;
         MBESSpanDirection = DefaultMBESSpanDirection;
+        cameraWidth = DefaultCameraWidth;
+        cameraHeight = DefaultCameraHeight;
+        cameraDepthBufferBits = 24;
+        cameraRenderTextureFormat = RenderTextureFormat.ARGB32;
+        cameraAspect = DefaultCameraAspect;
+        cameraOrthographic = DefaultCameraOrthographic;
+        cameraOrthographicSize = DefaultCameraOrthographicSize;
+        cameraFieldOfView = DefaultCameraFieldOfView;
+        cameraNearClipPlane = DefaultCameraNearClipPlane;
+        cameraFarClipPlane = DefaultCameraFarClipPlane;
     }
 
     // Регистрирует общий экземпляр настроек

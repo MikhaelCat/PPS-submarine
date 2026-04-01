@@ -52,6 +52,7 @@ public class AUV : MonoBehaviour
 
     private Rigidbody rb;
     private AUVSettings auvSettings;
+    private AUVCamera sensorCamera;
 
     // === MBES ===
     private MBESHit[] mbesHits = System.Array.Empty<MBESHit>();
@@ -115,6 +116,9 @@ public class AUV : MonoBehaviour
 
         // MBES
         MBESInit();
+
+        // Sensor Camera
+        CameraInit();
 
         // UI
         UIInit();
@@ -605,6 +609,92 @@ public class AUV : MonoBehaviour
         mbesTexture.Apply(false, false);
     }
 
+    // === Sensor Camera ===
+    
+    private void CameraInit()
+    {
+        sensorCamera = GetComponentInChildren<AUVCamera>(true);
+        if (sensorCamera != null)
+        {
+            return;
+        }
+
+        Camera[] childCameras = GetComponentsInChildren<Camera>(true);
+        Camera fallbackCamera = null;
+        if (childCameras.Length > 0)
+        {
+            for (int i = 0; i < childCameras.Length; i++)
+            {
+                if (childCameras[i] == null)
+                {
+                    continue;
+                }
+
+                fallbackCamera = childCameras[i];
+                if (string.Equals(childCameras[i].name, "AUVCamera", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    break;
+                }
+            }
+        }
+
+        if (fallbackCamera == null)
+        {
+            return;
+        }
+
+        sensorCamera = fallbackCamera.GetComponent<AUVCamera>();
+        if (sensorCamera == null)
+        {
+            sensorCamera = fallbackCamera.gameObject.AddComponent<AUVCamera>();
+        }
+    }
+
+    public bool TryGetCameraInfo(out AUVCamera.CameraInfo info)
+    {
+        if (sensorCamera == null)
+        {
+            CameraInit();
+        }
+
+        if (sensorCamera != null && sensorCamera.TryGetCameraInfo(out info))
+        {
+            return true;
+        }
+
+        info = default;
+        return false;
+    }
+
+    public bool TryGetCameraSnapshot(out AUVCamera.SnapshotData snapshot)
+    {
+        if (sensorCamera == null)
+        {
+            CameraInit();
+        }
+
+        if (sensorCamera != null && sensorCamera.TryGetSnapshotData(out snapshot))
+        {
+            return true;
+        }
+
+        snapshot = default;
+        return false;
+    }
+
+    public Texture GetCameraPreviewTexture()
+    {
+        if (sensorCamera == null)
+        {
+            CameraInit();
+        }
+
+        return sensorCamera != null ? sensorCamera.GetPreviewTexture() : null;
+    }
+
+    // === SONARS ===
+    /* Поддержка двух сонаров */
+    /* Твой код */
     // === UI ===
     private string MBESDisplay()
     {
@@ -646,6 +736,20 @@ public class AUV : MonoBehaviour
         Vector3 velocity = rb != null ? rb.linearVelocity : Vector3.zero;
 
         return $"Position: {transform.position.x:F2}, {transform.position.y:F2}, {transform.position.z:F2}\nRotation: {euler.x:F1}, {euler.y:F1}, {euler.z:F1}\nVelocity: {velocity.x:F2}, {velocity.y:F2}, {velocity.z:F2}";
+    }
+
+    private string CameraDisplay()
+    {
+        if (!TryGetCameraInfo(out AUVCamera.CameraInfo info))
+        {
+            return "Camera: no data";
+        }
+
+        string projectionInfo = info.orthographic
+            ? $"ortho size {info.orthographicSize:F2}"
+            : $"fov {info.fieldOfView:F1}";
+
+        return $"Camera: {info.width}x{info.height} | aspect {info.aspect:F2} | {projectionInfo} | near {info.nearClipPlane:F2} | far {info.farClipPlane:F1}";
     }
 
     private void UIInit()
@@ -700,10 +804,12 @@ public class AUV : MonoBehaviour
         string mbesText = MBESDisplay();
         string motorText = MotorInfDisplay();
         string positionText = PositionDisplay();
+        string cameraText = CameraDisplay();
+        Texture cameraPreview = GetCameraPreviewTexture();
 
         float margin = 16f;
         float panelWidth = Mathf.Max(320f, Mathf.Min(Screen.width - (margin * 2f), 760f));
-        Rect panelRect = new Rect(margin, margin, panelWidth, 260f);
+        Rect panelRect = new Rect(margin, margin, panelWidth, 470f);
         DrawFilledRect(panelRect, new Color(0.05f, 0.08f, 0.12f, 0.82f));
 
         GUI.Label(new Rect(panelRect.x + 12f, panelRect.y + 10f, panelRect.width - 24f, 22f), $"AUV #{id}", uiTitleStyle);
@@ -716,8 +822,17 @@ public class AUV : MonoBehaviour
         }
 
         GUI.Label(new Rect(mbesRect.x, mbesRect.yMax + 6f, panelRect.width - 24f, 36f), mbesText, uiTextStyle);
-        GUI.Label(new Rect(panelRect.x + 12f, panelRect.y + 138f, (panelRect.width * 0.5f) - 18f, 110f), motorText, uiTextStyle);
-        GUI.Label(new Rect(panelRect.x + (panelRect.width * 0.5f), panelRect.y + 138f, (panelRect.width * 0.5f) - 12f, 110f), positionText, uiTextStyle);
+        GUI.Label(new Rect(panelRect.x + 12f, panelRect.y + 138f, (panelRect.width * 0.5f) - 18f, 96f), motorText, uiTextStyle);
+        GUI.Label(new Rect(panelRect.x + (panelRect.width * 0.5f), panelRect.y + 138f, (panelRect.width * 0.5f) - 12f, 96f), positionText, uiTextStyle);
+
+        Rect cameraRect = new Rect(panelRect.x + 12f, panelRect.y + 246f, panelRect.width - 24f, 180f);
+        DrawFilledRect(cameraRect, new Color(0.07f, 0.1f, 0.14f, 0.95f));
+        if (cameraPreview != null)
+        {
+            GUI.DrawTexture(cameraRect, cameraPreview, ScaleMode.ScaleToFit, false);
+        }
+
+        GUI.Label(new Rect(cameraRect.x, cameraRect.yMax + 8f, panelRect.width - 24f, 28f), cameraText, uiTextStyle);
     }
 
     private void DrawFilledRect(Rect rect, Color color)

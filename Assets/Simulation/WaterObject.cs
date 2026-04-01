@@ -10,12 +10,14 @@ public class WaterObject : MonoBehaviour
     private const float DefaultMetacentricHeight = 0.013f;
     private const float DefaultGenerationStepCOB = 0.25f;
     private static readonly Vector3 DefaultCenterOfBuoyancy = new Vector3(-6.68785f, 0, -0.0439f);
-    private const float DefaultForwardDrag = 700f;
+    private const float DefaultForwardDrag = 300f;
     private const float DefaultLateralDrag = 1000f;
     private const float DefaultVerticalDrag = 300f;
     private const float DefaultRollDrag = 100_000f;
     private const float DefaultPitchDrag = 100_000f;
     private const float DefaultYawDrag = 100_000f;
+    private const float AngularDragActivationSmoothing = 8f;
+    private const float AngularDragDeadZone = 0.02f;
 
     // Константы
     static float waterLevelY = 0f;
@@ -48,6 +50,7 @@ public class WaterObject : MonoBehaviour
     // Компоненты
     private Collider col;
     private Rigidbody rb;
+    private float smoothedAngularDragRatio;
 
     // === Инициализация | Стартовая генерация ===
 
@@ -212,6 +215,7 @@ public class WaterObject : MonoBehaviour
     {
         rb.linearDamping = 0f;
         rb.angularDamping = 0f;
+        smoothedAngularDragRatio = 0f;
     }
 
     // Стартовая настройка
@@ -340,9 +344,9 @@ public class WaterObject : MonoBehaviour
     public Vector3 LocalAngularDrag()
     {
         Vector3 localAngularVelocity = transform.InverseTransformDirection(rb.angularVelocity);
-        float velocity_x = localAngularVelocity[0];
-        float velocity_y = localAngularVelocity[1];
-        float velocity_z = localAngularVelocity[2];
+        float velocity_x = ApplyAngularDeadZone(localAngularVelocity[0]);
+        float velocity_y = ApplyAngularDeadZone(localAngularVelocity[1]);
+        float velocity_z = ApplyAngularDeadZone(localAngularVelocity[2]);
 
         float drag_x = -rollDrag * velocity_x * Mathf.Abs(velocity_x);
         float drag_y = -yawDrag * velocity_y * Mathf.Abs(velocity_y);
@@ -351,13 +355,36 @@ public class WaterObject : MonoBehaviour
         return new Vector3(drag_x, drag_y, drag_z);
     }
 
+    private static float ApplyAngularDeadZone(float angularVelocity)
+    {
+        float absVelocity = Mathf.Abs(angularVelocity);
+        if (absVelocity <= AngularDragDeadZone)
+        {
+            return 0f;
+        }
+
+        return angularVelocity - Mathf.Sign(angularVelocity) * AngularDragDeadZone;
+    }
+
+    private void UpdateAngularDragRatio(float targetRatio)
+    {
+        float blend = 1f - Mathf.Exp(-AngularDragActivationSmoothing * Time.fixedDeltaTime);
+        smoothedAngularDragRatio = Mathf.Lerp(smoothedAngularDragRatio, Mathf.Clamp01(targetRatio), blend);
+    }
+
     // Приминение сопротивления
     protected void ForceDrag(WaterInformation information)
     {
         if (information.inWater)
         {
+            UpdateAngularDragRatio(information.ratio);
+            float angularDragRatio = smoothedAngularDragRatio * smoothedAngularDragRatio;
             rb.AddRelativeForce(LocalLinearDrag() * information.ratio, ForceMode.Force);
-            rb.AddRelativeTorque(LocalAngularDrag() * information.ratio, ForceMode.Force);
+            rb.AddRelativeTorque(LocalAngularDrag() * angularDragRatio, ForceMode.Force);
+        }
+        else
+        {
+            UpdateAngularDragRatio(0f);
         }
     }
 

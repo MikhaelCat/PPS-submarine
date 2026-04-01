@@ -30,11 +30,32 @@ public class AUVAPIController : MonoBehaviour
         public bool IsValid => points != null;
     }
 
+    public struct AUVCameraData
+    {
+        public int auvId;
+        public int width;
+        public int height;
+        public float aspect;
+        public bool orthographic;
+        public float orthographicSize;
+        public float fieldOfView;
+        public float nearClipPlane;
+        public float farClipPlane;
+        public Vector3 worldPosition;
+        public Quaternion worldRotation;
+        public float capturedAtTime;
+        public long sequence;
+        public byte[] rgba32;
+
+        public bool IsValid => rgba32 != null && rgba32.Length > 0 && width > 0 && height > 0;
+    }
+
     // === Переменные класса ===
     private readonly Dictionary<int, AUV> auvById = new Dictionary<int, AUV>();
     private readonly object stateLock = new object();
     private Dictionary<int, AUV> auvByIdSnapshot = new Dictionary<int, AUV>();
     private Dictionary<int, MBESData> mbesByAuvId = new Dictionary<int, MBESData>();
+    private Dictionary<int, AUVCameraData> cameraByAuvId = new Dictionary<int, AUVCameraData>();
     private long nextSnapshotSequence = 1;
 
     // === Unity жизненный цикл ===
@@ -44,12 +65,14 @@ public class AUVAPIController : MonoBehaviour
     {
         RefreshAUVCache();
         RefreshMBESSnapshots();
+        RefreshCameraSnapshots();
     }
 
     private void LateUpdate()
     {
         RefreshAUVCache();
         RefreshMBESSnapshots();
+        RefreshCameraSnapshots();
     }
 
     // === Публичный API ===
@@ -127,6 +150,39 @@ public class AUVAPIController : MonoBehaviour
         return false;
     }
 
+    // Возвращает последний потокобезопасный снимок камеры конкретного AUV.
+    // В rgba32 лежит изображение в формате RGBA32, упакованное построчно.
+    public bool TryGetAUVCameraData(int auv_id, out AUVCameraData cameraData)
+    {
+        lock (stateLock)
+        {
+            if (!cameraByAuvId.TryGetValue(auv_id, out AUVCameraData cachedData) || !cachedData.IsValid)
+            {
+                cameraData = default;
+                return false;
+            }
+
+            cameraData = CloneCameraData(cachedData);
+            return true;
+        }
+    }
+
+    public bool TryGetAUVCameraImage(int auv_id, out byte[] rgba32, out int width, out int height)
+    {
+        if (TryGetAUVCameraData(auv_id, out AUVCameraData cameraData))
+        {
+            rgba32 = cameraData.rgba32;
+            width = cameraData.width;
+            height = cameraData.height;
+            return true;
+        }
+
+        rgba32 = Array.Empty<byte>();
+        width = 0;
+        height = 0;
+        return false;
+    }
+
     // === Вспомогательные функции ===
 
     // Забирает id моторов из общих настроек AUV
@@ -193,6 +249,44 @@ public class AUVAPIController : MonoBehaviour
         lock (stateLock)
         {
             mbesByAuvId = freshSnapshots;
+        }
+    }
+
+    private void RefreshCameraSnapshots()
+    {
+        Dictionary<int, AUVCameraData> freshSnapshots = new Dictionary<int, AUVCameraData>(auvById.Count);
+
+        foreach (KeyValuePair<int, AUV> pair in auvById)
+        {
+            AUV auv = pair.Value;
+            if (auv == null || !auv.TryGetCameraSnapshot(out AUVCamera.SnapshotData snapshot) || !snapshot.IsValid)
+            {
+                continue;
+            }
+
+            AUVCamera.CameraInfo info = snapshot.info;
+            freshSnapshots[pair.Key] = new AUVCameraData
+            {
+                auvId = auv.id,
+                width = info.width,
+                height = info.height,
+                aspect = info.aspect,
+                orthographic = info.orthographic,
+                orthographicSize = info.orthographicSize,
+                fieldOfView = info.fieldOfView,
+                nearClipPlane = info.nearClipPlane,
+                farClipPlane = info.farClipPlane,
+                worldPosition = info.worldPosition,
+                worldRotation = info.worldRotation,
+                capturedAtTime = info.capturedAtTime,
+                sequence = info.sequence,
+                rgba32 = snapshot.rgba32
+            };
+        }
+
+        lock (stateLock)
+        {
+            cameraByAuvId = freshSnapshots;
         }
     }
 
@@ -279,6 +373,27 @@ public class AUVAPIController : MonoBehaviour
             capturedAtTime = source.capturedAtTime,
             sequence = source.sequence,
             points = source.points != null ? (MBESPointReading[])source.points.Clone() : Array.Empty<MBESPointReading>()
+        };
+    }
+
+    private static AUVCameraData CloneCameraData(AUVCameraData source)
+    {
+        return new AUVCameraData
+        {
+            auvId = source.auvId,
+            width = source.width,
+            height = source.height,
+            aspect = source.aspect,
+            orthographic = source.orthographic,
+            orthographicSize = source.orthographicSize,
+            fieldOfView = source.fieldOfView,
+            nearClipPlane = source.nearClipPlane,
+            farClipPlane = source.farClipPlane,
+            worldPosition = source.worldPosition,
+            worldRotation = source.worldRotation,
+            capturedAtTime = source.capturedAtTime,
+            sequence = source.sequence,
+            rgba32 = source.rgba32 != null ? (byte[])source.rgba32.Clone() : Array.Empty<byte>()
         };
     }
 
