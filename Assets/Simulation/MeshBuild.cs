@@ -35,13 +35,14 @@ public class MeshBuild : MonoBehaviour
         List<CombineInstance> combineInstances = new List<CombineInstance>();
         List<Material> materials = new List<Material>();
         HashSet<GameObject> sourceObjects = new HashSet<GameObject>();
+        HashSet<Transform> preservedRoots = GetPreservedRoots();
         Matrix4x4 rootWorldToLocal = transform.worldToLocalMatrix;
         int totalVertexCount = 0;
 
         for (int i = 0; i < meshFilters.Length; i++)
         {
             MeshFilter meshFilter = meshFilters[i];
-            if (meshFilter == null || meshFilter.transform == transform)
+            if (meshFilter == null || meshFilter.transform == transform || IsUnderPreservedRoot(meshFilter.transform, preservedRoots))
             {
                 continue;
             }
@@ -113,11 +114,58 @@ public class MeshBuild : MonoBehaviour
         {
             foreach (GameObject sourceObject in sourceObjects)
             {
-                sourceObject.SetActive(false);
+                if (sourceObject != null && !IsUnderPreservedRoot(sourceObject.transform, preservedRoots))
+                {
+                    sourceObject.SetActive(false);
+                }
             }
         }
 
         isBuilt = true;
+    }
+
+    private HashSet<Transform> GetPreservedRoots()
+    {
+        HashSet<Transform> preservedRoots = new HashSet<Transform>();
+        AUVAnimation auvAnimation = GetComponent<AUVAnimation>();
+        if (auvAnimation == null)
+        {
+            return preservedRoots;
+        }
+
+        Transform[] animatedParts = auvAnimation.GetAnimatedParts();
+        if (animatedParts == null)
+        {
+            return preservedRoots;
+        }
+
+        for (int i = 0; i < animatedParts.Length; i++)
+        {
+            if (animatedParts[i] != null)
+            {
+                preservedRoots.Add(animatedParts[i]);
+            }
+        }
+
+        return preservedRoots;
+    }
+
+    private static bool IsUnderPreservedRoot(Transform candidate, HashSet<Transform> preservedRoots)
+    {
+        if (candidate == null || preservedRoots == null || preservedRoots.Count == 0)
+        {
+            return false;
+        }
+
+        foreach (Transform root in preservedRoots)
+        {
+            if (root != null && candidate.IsChildOf(root))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private Material GetMaterialForSubMesh(MeshRenderer renderer, int subMeshIndex)
