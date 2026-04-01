@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: d432e3d7226ce0b429c23fd3da10e5ae
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 9100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 263329
+  packageName: Emperor Angelfish
+  packageVersion: 2.0.0
+  assetPath: Assets/Mikhail Nesterov/Emperor Angelfish/Art/Animations/AC_EmperorA_Turn_L_loop.controller
+  uploadId: 863562

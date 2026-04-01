@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+<<<<<<< HEAD
+guid: eba548cc22ba4ba438be1839806ed024
+=======
+guid: b320c671ae0e44346b810ceb4c975083
+>>>>>>> d65b31d4c24bc6ed22b92b3e45f156a77c656bb2
+DefaultImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 247391
+  packageName: Low Poly 3D Whell Model Pack
+  packageVersion: 1.0
+  assetPath: Assets/wheel/Demo_Scene/wheel_Demo.unity
+  uploadId: 573570

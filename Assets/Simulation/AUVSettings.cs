@@ -4,7 +4,7 @@ using UnityEngine;
 // Общие настройки для всех AUV в сцене
 public class AUVSettings : MonoBehaviour
 {
-    private const float DefaultMaxPower = 1000f;
+    private const float DefaultMaxPower = 10000f;
     private const int DefaultMBESPointsCount = 1024;
     private const int DefaultMBESDistance = 80;
     private const float DefaultMBESMaxRange = 200f;

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: bac61e70dc780c443853fa9b4d520b7f
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 221309
+  packageName: Ultra Realistic Metal Barrels with PBR Materials
+  packageVersion: 1.0
+  assetPath: Assets/Metal Barrels/Materials/RedBarrel.mat
+  uploadId: 497410

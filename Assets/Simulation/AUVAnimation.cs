@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 // Визуальная анимация пропеллеров AUV на основе текущих команд моторов
-[RequireComponent(typeof(AUV), typeof(AUVAnimationSettings))]
+[RequireComponent(typeof(AUV))]
 public class AUVAnimation : MonoBehaviour
 {
     // === Unity параметры ===
@@ -19,10 +19,6 @@ public class AUVAnimation : MonoBehaviour
 
     [Header("Animation")]
     [SerializeField] private float maxDegreesPerSecond = 1440f;
-    [SerializeField] private Vector3 topMotorsAxis = Vector3.right;
-    [SerializeField] private Vector3 sideMotorsAxis = Vector3.right;
-    [SerializeField] private bool invertTopMotors = false;
-    [SerializeField] private bool invertSideMotors = false;
 
     // === Константы ===
     private const string TopFrontPartName = "Properell2";
@@ -80,13 +76,24 @@ public class AUVAnimation : MonoBehaviour
             missingPartsLogged = false;
         }
 
-        AnimateMotor(topFrontMotorPart, animationSettings.TopFrontMotorId, topMotorsAxis, invertTopMotors);
-        AnimateMotor(topRearMotorPart, animationSettings.TopRearMotorId, topMotorsAxis, invertTopMotors);
-        AnimateMotor(sideLeftMotorPart, animationSettings.SideLeftMotorId, sideMotorsAxis, invertSideMotors);
-        AnimateMotor(sideRightMotorPart, animationSettings.SideRightMotorId, sideMotorsAxis, invertSideMotors);
+        AnimateMotor(topFrontMotorPart, animationSettings.TopFrontMotorId, animationSettings.TopFrontRotationVector);
+        AnimateMotor(topRearMotorPart, animationSettings.TopRearMotorId, animationSettings.TopRearRotationVector);
+        AnimateMotor(sideLeftMotorPart, animationSettings.SideLeftMotorId, animationSettings.SideLeftRotationVector);
+        AnimateMotor(sideRightMotorPart, animationSettings.SideRightMotorId, animationSettings.SideRightRotationVector);
     }
 
     // === Вспомогательные функции ===
+
+    public Transform[] GetAnimatedParts()
+    {
+        return new[]
+        {
+            topFrontMotorPart,
+            topRearMotorPart,
+            sideLeftMotorPart,
+            sideRightMotorPart
+        };
+    }
 
     // Кэширует обязательные/опциональные компоненты
     private void CacheComponents()
@@ -145,7 +152,7 @@ public class AUVAnimation : MonoBehaviour
     }
 
     // Вращает визуальный мотор согласно текущей команде силы
-    private void AnimateMotor(Transform motorPart, int motorId, Vector3 axis, bool invert)
+    private void AnimateMotor(Transform motorPart, int motorId, Vector3 rotationVector)
     {
         if (motorPart == null)
         {
@@ -162,11 +169,20 @@ public class AUVAnimation : MonoBehaviour
             return;
         }
 
-        float direction = invert ? -1f : 1f;
-        float rotationStep = maxDegreesPerSecond * (commandPercent / 100f) * direction * Time.deltaTime;
-        Vector3 rotationAxis = axis.sqrMagnitude > 0f ? axis.normalized : Vector3.right;
+        Vector3 rotationAxis = rotationVector.sqrMagnitude > 0.0001f ? rotationVector.normalized : Vector3.right;
+        float rotationStep = maxDegreesPerSecond * (commandPercent / 100f) * Time.deltaTime;
+        Vector3 worldAxis = motorPart.TransformDirection(rotationAxis).normalized;
 
-        motorPart.Rotate(rotationAxis, rotationStep, Space.Self);
+        if (TryGetGeometricCenterWorld(motorPart, out Vector3 centerWorld))
+        {
+            // Some imported propeller meshes have their pivot stuck at the model origin.
+            // Rotate around the visible geometry center instead of the transform pivot.
+            motorPart.RotateAround(centerWorld, worldAxis, rotationStep);
+        }
+        else
+        {
+            motorPart.Rotate(rotationAxis, rotationStep, Space.Self);
+        }
     }
 
     // Ищет дочерний трансформ рекурсивно по имени
@@ -217,5 +233,45 @@ public class AUVAnimation : MonoBehaviour
 
             CollectMotorCandidates(child, output);
         }
+    }
+
+    private static bool TryGetGeometricCenterWorld(Transform motorPart, out Vector3 centerWorld)
+    {
+        Renderer[] renderers = motorPart.GetComponentsInChildren<Renderer>(true);
+        if (renderers == null || renderers.Length == 0)
+        {
+            centerWorld = motorPart.position;
+            return false;
+        }
+
+        bool hasBounds = false;
+        Bounds combinedBounds = default;
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Renderer renderer = renderers[i];
+            if (renderer == null || !renderer.enabled)
+            {
+                continue;
+            }
+
+            if (!hasBounds)
+            {
+                combinedBounds = renderer.bounds;
+                hasBounds = true;
+            }
+            else
+            {
+                combinedBounds.Encapsulate(renderer.bounds);
+            }
+        }
+
+        if (!hasBounds)
+        {
+            centerWorld = motorPart.position;
+            return false;
+        }
+
+        centerWorld = combinedBounds.center;
+        return true;
     }
 }
