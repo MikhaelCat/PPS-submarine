@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 2dbfb33fce38eda49b50db54dc3f1055
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 4890085278179872738
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 153468
+  packageName: Shipping Container PBR (UNITY 6 SAMPLE)
+  packageVersion: 1.0
+  assetPath: Assets/Sayantan/Props/Large/Container_FREE/Scenes/Demo_Night_StandardSettings.lighting
+  uploadId: 726347
