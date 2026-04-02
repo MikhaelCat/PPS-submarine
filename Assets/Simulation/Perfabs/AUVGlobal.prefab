@@ -97,7 +97,7 @@ MonoBehaviour:
   InputActions: {fileID: -944628639613478452, guid: 7d7ce558a7423f74ebbc63ef9167a4a5, type: 3}
   ActionMapName: AUV
   OrbitCamera: {fileID: 8349847981791679676}
-  SpawnPrefab: {fileID: 0}
+  SpawnPrefab: {fileID: 453636208980510970, guid: 64da26a8419fbad4d870441389573afb, type: 3}
   SpawnParent: {fileID: 0}
   SpawnWorldPosition: {x: 0, y: 50, z: 0}
   SpawnWorldEulerAngles: {x: 0, y: 0, z: 0}
