@@ -20,6 +20,9 @@ Assets/Scenes/
 *.blend1
 *.blend1.meta
 
+
+Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF - Fallback.asset
+
 # MemoryCaptures can get excessive in size.
 # They also could contain extremely sensitive data
 /[Mm]emoryCaptures/

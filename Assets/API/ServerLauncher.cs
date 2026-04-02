@@ -117,25 +117,58 @@ public class ServerLauncher : MonoBehaviour
                     List<float> listX = new List<float>();
                     List<float> listY = new List<float>();
 
-                    // Пропускаем каждую вторую точку (шаг 2), чтобы гарантированно влезть в буфер UDP
+
                     int step = 2;
                     for (int i = 0; i < mbesData.points.Length; i += step)
                     {
                         var pt = mbesData.points[i];
                         if (pt.hasHit)
                         {
-                            // Округляем до 1 знака после запятой — это убирает лишний мусор из JSON строки
                             listX.Add((float)Math.Round(pt.pointLocal.x, 1));
                             listY.Add((float)Math.Round(pt.pointLocal.y, 1));
                         }
                     }
 
-                    // Отправляем два простых массива вместо сложной структуры объектов
                     return Task.FromResult<(int, string, object)>((200, "Success", (object)new { points_x = listX, points_y = listY }));
                 }
                 else
                 {
                     return Task.FromResult<(int, string, object)>((404, $"No MBES data for AUV {auvId}", null));
+                }
+            }
+            catch (Exception ex)
+            {
+                return Task.FromResult<(int, string, object)>((400, ex.Message, null));
+            }
+        });
+
+        _server.AddRequest("get_camera", (values) => {
+            try
+            {
+                int auvId = Convert.ToInt32(values["auv_id"]);
+
+                if (auvController.TryGetAUVCameraImage(auvId, out byte[] rgba32, out int width, out int height))
+                {
+                    // 1. Создаем текстуру и загружаем сырые пиксели
+                    Texture2D tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
+                    tex.LoadRawTextureData(rgba32);
+                    tex.Apply();
+
+                    // 2. Сжимаем в JPG с качеством 50%. 
+                    // Это визуально почти не изменит картинку 256x256, но сожмет ее до 10-15 КБ.
+                    byte[] jpgBytes = tex.EncodeToJPG(50);
+
+                    // Обязательно выгружаем текстуру из памяти, иначе получим жесткую утечку (Memory Leak)
+                    Destroy(tex);
+
+                    // 3. Кодируем бинарные данные JPG в текстовый формат Base64 для передачи через JSON
+                    string base64Image = Convert.ToBase64String(jpgBytes);
+
+                    return Task.FromResult<(int, string, object)>((200, "Success", (object)new { camera_image = base64Image }));
+                }
+                else
+                {
+                    return Task.FromResult<(int, string, object)>((404, $"No camera data for AUV {auvId}", null));
                 }
             }
             catch (Exception ex)
