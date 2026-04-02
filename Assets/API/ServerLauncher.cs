@@ -177,6 +177,43 @@ public class ServerLauncher : MonoBehaviour
             }
         });
 
+        _server.AddRequest("get_side_sonar", (values) => {
+            try
+            {
+                int auvId = Convert.ToInt32(values["auv_id"]);
+
+                if (auvController.TryGetAUVSideSonarData(auvId, out var sonarData))
+                {
+                    // Для Side Scan Sonar нам важнее всего интенсивность (отражающая способность дна)
+                    // Формируем два массива интенсивностей для левого и правого борта
+                    float[] leftIntensities = new float[sonarData.pointsPerSide];
+                    float[] rightIntensities = new float[sonarData.pointsPerSide];
+
+                    for (int i = 0; i < sonarData.pointsPerSide; i++)
+                    {
+                        leftIntensities[i] = sonarData.leftLine[i].intensity;
+                        rightIntensities[i] = sonarData.rightLine[i].intensity;
+                    }
+
+                    return Task.FromResult<(int, string, object)>((200, "Success", (object)new
+                    {
+                        left = leftIntensities,
+                        right = rightIntensities,
+                        max_range = sonarData.maxRange,
+                        count = sonarData.pointsPerSide
+                    }));
+                }
+                else
+                {
+                    return Task.FromResult<(int, string, object)>((404, $"No Sonar data for AUV {auvId}", null));
+                }
+            }
+            catch (Exception ex)
+            {
+                return Task.FromResult<(int, string, object)>((400, ex.Message, null));
+            }
+        });
+
         _server.Start();
     }
 
