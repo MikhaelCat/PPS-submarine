@@ -15,13 +15,12 @@ public class ServerLauncher : MonoBehaviour
 
     void Start()
     {
-        // ŒÚÍÎ˛˜‡ÂÏ Û˜ÌÓÂ ÛÔ‡‚ÎÂÌËÂ Ì‡Ô‡ÌËÍ‡
         AUVControllerManager manualManager = FindAnyObjectByType<AUVControllerManager>();
         if (manualManager != null) manualManager.enabled = false;
 
         _server = new ServerRuntime(port);
 
-        // --- Õ»« Œ”–Œ¬Õ≈¬€≈  ŒÃ¿Õƒ€ ---
+        // --- –ù–ò–ó–ö–û–£–†–û–í–ù–ï–í–´–ï –ö–û–ú–ê–ù–î–´ ---
 
         _server.AddRequest("set_motor_speed", (values) => {
             try
@@ -31,7 +30,8 @@ public class ServerLauncher : MonoBehaviour
                 float force = Convert.ToSingle(values["force"]);
 
                 int status = auvController.SetAUVMotorSpeed(auvId, motorId, force);
-                return Task.FromResult<(int, string, object)>((200, status == 0 ? "Success" : $"Error Code: {status}", new { status }));
+                // –Ø–≤–Ω–æ –ø—Ä–∏–≤–æ–¥–∏–º –∞–Ω–æ–Ω–∏–º–Ω—ã–π —Ç–∏–ø –∫ object
+                return Task.FromResult<(int, string, object)>((200, status == 0 ? "Success" : $"Error Code: {status}", (object)new { status }));
             }
             catch (Exception ex)
             {
@@ -43,7 +43,7 @@ public class ServerLauncher : MonoBehaviour
             try
             {
                 var ids = auvController.GetAUVs();
-                return Task.FromResult<(int, string, object)>((200, "Success", new { auv_ids = ids }));
+                return Task.FromResult<(int, string, object)>((200, "Success", (object)new { auv_ids = ids }));
             }
             catch (Exception ex)
             {
@@ -54,8 +54,10 @@ public class ServerLauncher : MonoBehaviour
         _server.AddRequest("get_motor_ids", (values) => {
             try
             {
-                var ids = auvController.GetAUVMotorIds();
-                return Task.FromResult<(int, string, object)>((200, "Success", new { motor_ids = ids }));
+                // –ò–°–ü–†–ê–í–õ–ï–ù–û: –î–æ–±–∞–≤–ª–µ–Ω auv_id, —Ç–∞–∫ –∫–∞–∫ –∫–æ–Ω—Ç—Ä–æ–ª–ª–µ—Ä —Ç—Ä–µ–±—É–µ—Ç –µ–≥–æ –¥–ª—è –ø–æ–∏—Å–∫–∞ –º–æ—Ç–æ—Ä–æ–≤
+                int auvId = Convert.ToInt32(values["auv_id"]);
+                var ids = auvController.GetAUVMotorIds(auvId);
+                return Task.FromResult<(int, string, object)>((200, "Success", (object)new { motor_ids = ids }));
             }
             catch (Exception ex)
             {
@@ -63,49 +65,78 @@ public class ServerLauncher : MonoBehaviour
             }
         });
 
-        // ---  ŒÃ¿Õƒ€ œŒ “≈’Õ»◊≈— ŒÃ” «¿ƒ¿Õ»ﬁ ---
-
-        _server.AddRequest("spawn_object", (values) => {
-            try
-            {
-                string type = values["type"].ToString();
-                Vector3 pos = ParseVector(values["position"]);
-
-                Debug.Log($"[“« –≈ƒ¿ “Œ–] —ÓÁ‰‡ÌËÂ Ó·˙ÂÍÚ‡: {type} ‚ ÔÓÁËˆËË {pos}");
-                return Task.FromResult<(int, string, object)>((200, $"Object {type} spawned (simulated)", new { success = true }));
-            }
-            catch (Exception ex)
-            {
-                return Task.FromResult<(int, string, object)>((400, ex.Message, null));
-            }
-        });
-
-        _server.AddRequest("delete_object", (values) => {
-            try
-            {
-                string objectId = values["id"].ToString();
-                Debug.Log($"[“« –≈ƒ¿ “Œ–] ”‰‡ÎÂÌËÂ Ó·˙ÂÍÚ‡ Ò ID: {objectId}");
-                return Task.FromResult<(int, string, object)>((200, "Object deleted (simulated)", new { success = true }));
-            }
-            catch (Exception ex)
-            {
-                return Task.FromResult<(int, string, object)>((400, ex.Message, null));
-            }
-        });
+        // --- –ö–û–ú–ê–ù–î–´ –ü–û –¢–ï–•–ù–ò–ß–ï–°–ö–û–ú–£ –ó–ê–î–ê–ù–ò–Æ ---
 
         _server.AddRequest("get_telemetry", (values) => {
             try
             {
                 int auvId = Convert.ToInt32(values["auv_id"]);
+                AUV targetAuv = null;
+
+                AUV[] allAuvs = FindObjectsByType<AUV>(FindObjectsInactive.Exclude);
+                for (int i = 0; i < allAuvs.Length; i++)
+                {
+                    if (allAuvs[i].id == auvId)
+                    {
+                        targetAuv = allAuvs[i];
+                        break;
+                    }
+                }
+
+                if (targetAuv == null) return Task.FromResult<(int, string, object)>((404, $"AUV {auvId} not found", null));
+
+                Rigidbody rb = targetAuv.GetComponent<Rigidbody>();
+
                 var telemetry = new
                 {
-                    depth = UnityEngine.Random.Range(10f, 100f),
-                    pitch = UnityEngine.Random.Range(-5f, 5f),
-                    roll = UnityEngine.Random.Range(-2f, 2f),
-                    yaw = UnityEngine.Random.Range(0f, 360f)
+                    x = targetAuv.transform.position.x,
+                    y = targetAuv.transform.position.z,
+                    depth = -targetAuv.transform.position.y,
+                    pitch = targetAuv.transform.eulerAngles.x,
+                    roll = targetAuv.transform.eulerAngles.z,
+                    yaw = targetAuv.transform.eulerAngles.y,
+                    // –ò–°–ü–†–ê–í–õ–ï–ù–û: –∏—Å–ø–æ–ª—å–∑—É–µ–º linearVelocity –¥–ª—è –Ω–æ–≤—ã—Ö –≤–µ—Ä—Å–∏–π Unity
+                    speed = rb != null ? rb.linearVelocity.magnitude : 0f
                 };
-                Debug.Log($"[“« “≈À≈Ã≈“–»ﬂ] ŒÚÔ‡‚Í‡ ‰‡ÌÌ˚ı ‰Îˇ AUV {auvId}");
-                return Task.FromResult<(int, string, object)>((200, "Success", telemetry));
+
+                return Task.FromResult<(int, string, object)>((200, "Success", (object)telemetry));
+            }
+            catch (Exception ex)
+            {
+                return Task.FromResult<(int, string, object)>((400, ex.Message, null));
+            }
+        });
+
+        _server.AddRequest("get_mbes", (values) => {
+            try
+            {
+                int auvId = Convert.ToInt32(values["auv_id"]);
+
+                if (auvController.TryGetAUVMBESData(auvId, out var mbesData))
+                {
+                    List<float> listX = new List<float>();
+                    List<float> listY = new List<float>();
+
+                    // –ü—Ä–æ–ø—É—Å–∫–∞–µ–º –∫–∞–∂–¥—É—é –≤—Ç–æ—Ä—É—é —Ç–æ—á–∫—É (—à–∞–≥ 2), —á—Ç–æ–±—ã –≥–∞—Ä–∞–Ω—Ç–∏—Ä–æ–≤–∞–Ω–Ω–æ –≤–ª–µ–∑—Ç—å –≤ –±—É—Ñ–µ—Ä UDP
+                    int step = 2;
+                    for (int i = 0; i < mbesData.points.Length; i += step)
+                    {
+                        var pt = mbesData.points[i];
+                        if (pt.hasHit)
+                        {
+                            // –û–∫—Ä—É–≥–ª—è–µ–º –¥–æ 1 –∑–Ω–∞–∫–∞ –ø–æ—Å–ª–µ –∑–∞–ø—è—Ç–æ–π ‚Äî —ç—Ç–æ —É–±–∏—Ä–∞–µ—Ç –ª–∏—à–Ω–∏–π –º—É—Å–æ—Ä –∏–∑ JSON —Å—Ç—Ä–æ–∫–∏
+                            listX.Add((float)Math.Round(pt.pointLocal.x, 1));
+                            listY.Add((float)Math.Round(pt.pointLocal.y, 1));
+                        }
+                    }
+
+                    // –û—Ç–ø—Ä–∞–≤–ª—è–µ–º –¥–≤–∞ –ø—Ä–æ—Å—Ç—ã—Ö –º–∞—Å—Å–∏–≤–∞ –≤–º–µ—Å—Ç–æ —Å–ª–æ–∂–Ω–æ–π —Å—Ç—Ä—É–∫—Ç—É—Ä—ã –æ–±—ä–µ–∫—Ç–æ–≤
+                    return Task.FromResult<(int, string, object)>((200, "Success", (object)new { points_x = listX, points_y = listY }));
+                }
+                else
+                {
+                    return Task.FromResult<(int, string, object)>((404, $"No MBES data for AUV {auvId}", null));
+                }
             }
             catch (Exception ex)
             {
@@ -114,7 +145,6 @@ public class ServerLauncher : MonoBehaviour
         });
 
         _server.Start();
-        Debug.Log($"[API Server] —Â‚Â Á‡ÔÛ˘ÂÌ Ì‡ ÔÓÚÛ {port}. ÀÓ„ËÍ‡ Update ÓÚÍÎ˛˜ÂÌ‡.");
     }
 
     private Vector3 ParseVector(object data)
