@@ -14,6 +14,9 @@ public class AUV : MonoBehaviour
     private static readonly Color MBESNearColor = new Color(0.98f, 0.98f, 0.96f, 1f);
     private static readonly Color MBESFarColor = new Color(0.24f, 0.32f, 0.4f, 1f);
     private static readonly Color MBESMissColor = new Color(0.1f, 0.13f, 0.17f, 1f);
+    private static readonly string[] MBESPointSearchNames = { "MBESPoint", "MBES", "MBES Point" };
+    private static readonly string[] SideSonarLeftSearchNames = { "SideSonarLeftPoint", "SideSonarLeft", "LeftSideSonar", "LeftSonar", "SonarLeft" };
+    private static readonly string[] SideSonarRightSearchNames = { "SideSonarRightPoint", "SideSonarRight", "RightSideSonar", "RightSonar", "SonarRight" };
 
     // ID
     protected static int nextid = 0;
@@ -28,6 +31,11 @@ public class AUV : MonoBehaviour
 
     [Header("UI")]
     [SerializeField] bool UIOn = false;
+
+    [Header("Sensors")]
+    [SerializeField] private Transform localMBESPoint;
+    [SerializeField] private Transform localSideSonarLeftPoint;
+    [SerializeField] private Transform localSideSonarRightPoint;
 
     // Переменные класса
     protected struct Motor
@@ -44,6 +52,23 @@ public class AUV : MonoBehaviour
         public Vector3 pointWorld;
         public Vector3 pointLocal;
         public Vector3 normalWorld;
+    }
+
+    public enum SideSonarSide
+    {
+        Left = 0,
+        Right = 1
+    }
+
+    public struct SideSonarHit
+    {
+        public bool hasHit;
+        public float range;
+        public float intensity;
+        public Vector3 pointWorld;
+        public Vector3 pointLocal;
+        public Vector3 normalWorld;
+        public Vector3 rayDirectionWorld;
     }
 
     protected Motor[] Motors = System.Array.Empty<Motor>();
@@ -66,9 +91,20 @@ public class AUV : MonoBehaviour
     private float mbesNearestHitRange = 0f;
     private float mbesFarthestHitRange = 0f;
 
+    // === Side sonars ===
+    private Transform sideSonarLeftPoint;
+    private Transform sideSonarRightPoint;
+    private float sideSonarMaxRange = 0f;
+    private float sideSonarDownAngleDegrees = 45f;
+    private float sideSonarDistanceAttenuation = 0.05f;
+    private SideSonarHit sideSonarLeftHit;
+    private SideSonarHit sideSonarRightHit;
+
     // === UI ===
     private GUIStyle uiTitleStyle;
     private GUIStyle uiTextStyle;
+    private GUIStyle uiCenteredTitleStyle;
+    private GUIStyle uiCenteredTextStyle;
     private Texture2D uiFillTexture;
     private Texture2D mbesTexture;
     private Color[] mbesTexturePixels = System.Array.Empty<Color>();
@@ -117,6 +153,9 @@ public class AUV : MonoBehaviour
         // MBES
         MBESInit();
 
+        // Side sonars
+        SideSonarInit();
+
         // Sensor Camera
         CameraInit();
 
@@ -138,6 +177,7 @@ public class AUV : MonoBehaviour
         applyLegacyInertiaTensor = true;
         inertiaTensor = DefaultInertiaTensor;
         useMotorForcePoints = true;
+        AssignLocalSensorPointsIfMissing();
     }
 
     private void Awake()
@@ -146,10 +186,16 @@ public class AUV : MonoBehaviour
         Init();
     }
 
+    private void OnValidate()
+    {
+        AssignLocalSensorPointsIfMissing();
+    }
+
     private void FixedUpdate()
     {
         ApllyMotorForce();
         MBESUpdate();
+        SideSonarUpdate();
     }
 
     private void OnGUI()
@@ -372,7 +418,7 @@ public class AUV : MonoBehaviour
         mbesPointsCount = Mathf.Max(2, auvSettings.MBESPointsCount);
         mbesDistance = Mathf.Clamp(auvSettings.MBESDistance, 1f, 100f);
         mbesMaxRange = Mathf.Max(0.1f, auvSettings.MBESMaxRange);
-        mbesPoint = auvSettings.MBESPoint != null ? auvSettings.MBESPoint : transform;
+        mbesPoint = ResolveSensorTransform(localMBESPoint, MBESPointSearchNames);
         mbesLookDirectionLocal = NormalizeDirection(auvSettings.MBESLookDirection, Vector3.down);
         mbesSpanDirectionLocal = NormalizeDirection(auvSettings.MBESSpanDirection, Vector3.right);
 
@@ -609,6 +655,96 @@ public class AUV : MonoBehaviour
         mbesTexture.Apply(false, false);
     }
 
+    // === Side Sonars ===
+
+    private void SideSonarInit()
+    {
+        sideSonarLeftPoint = ResolveSensorTransform(localSideSonarLeftPoint, SideSonarLeftSearchNames);
+        sideSonarRightPoint = ResolveSensorTransform(localSideSonarRightPoint, SideSonarRightSearchNames);
+        sideSonarMaxRange = Mathf.Max(0.1f, auvSettings.SideSonarMaxRange);
+        sideSonarDownAngleDegrees = Mathf.Clamp(auvSettings.SideSonarDownAngleDegrees, 1f, 89f);
+        sideSonarDistanceAttenuation = Mathf.Max(0f, auvSettings.SideSonarDistanceAttenuation);
+
+        sideSonarLeftHit = CreateSideSonarMiss(sideSonarLeftPoint, -1);
+        sideSonarRightHit = CreateSideSonarMiss(sideSonarRightPoint, 1);
+    }
+
+    private void SideSonarUpdate()
+    {
+        sideSonarLeftHit = SampleSideSonar(sideSonarLeftPoint, -1);
+        sideSonarRightHit = SampleSideSonar(sideSonarRightPoint, 1);
+    }
+
+    private SideSonarHit SampleSideSonar(Transform sonarTransform, int sideSign)
+    {
+        Transform originTransform = sonarTransform != null ? sonarTransform : transform;
+        Vector3 rayDirection = GetSideSonarRayDirection(originTransform, sideSign);
+        Vector3 origin = originTransform.position + rayDirection * MBESOriginOffset;
+
+        if (Physics.Raycast(origin, rayDirection, out RaycastHit hit, sideSonarMaxRange, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+        {
+            float angleFactor = Mathf.Clamp01(Vector3.Dot(hit.normal, -rayDirection));
+            float attenuation = 1f / (1f + hit.distance * sideSonarDistanceAttenuation);
+            float intensity = angleFactor * attenuation;
+
+            return new SideSonarHit
+            {
+                hasHit = true,
+                range = hit.distance,
+                intensity = intensity,
+                pointWorld = hit.point,
+                pointLocal = transform.InverseTransformPoint(hit.point),
+                normalWorld = hit.normal,
+                rayDirectionWorld = rayDirection
+            };
+        }
+
+        return CreateSideSonarMiss(originTransform, sideSign);
+    }
+
+    private SideSonarHit CreateSideSonarMiss(Transform sonarTransform, int sideSign)
+    {
+        Transform originTransform = sonarTransform != null ? sonarTransform : transform;
+        Vector3 rayDirection = GetSideSonarRayDirection(originTransform, sideSign);
+        Vector3 missPoint = originTransform.position + rayDirection * sideSonarMaxRange;
+
+        return new SideSonarHit
+        {
+            hasHit = false,
+            range = sideSonarMaxRange,
+            intensity = 0f,
+            pointWorld = missPoint,
+            pointLocal = transform.InverseTransformPoint(missPoint),
+            normalWorld = -rayDirection,
+            rayDirectionWorld = rayDirection
+        };
+    }
+
+    private Vector3 GetSideSonarRayDirection(Transform originTransform, int sideSign)
+    {
+        float downAngleRadians = sideSonarDownAngleDegrees * Mathf.Deg2Rad;
+        float horizontalComponent = Mathf.Cos(downAngleRadians);
+        float verticalComponent = Mathf.Sin(downAngleRadians);
+        Vector3 localRayDirection = new Vector3(sideSign * horizontalComponent, -verticalComponent, 0f);
+        return originTransform.TransformDirection(localRayDirection.normalized);
+    }
+
+    public bool TryGetSideSonarHit(SideSonarSide side, out SideSonarHit hit)
+    {
+        hit = side == SideSonarSide.Left ? sideSonarLeftHit : sideSonarRightHit;
+        return true;
+    }
+
+    public bool TryGetLeftSideSonarHit(out SideSonarHit hit)
+    {
+        return TryGetSideSonarHit(SideSonarSide.Left, out hit);
+    }
+
+    public bool TryGetRightSideSonarHit(out SideSonarHit hit)
+    {
+        return TryGetSideSonarHit(SideSonarSide.Right, out hit);
+    }
+
     // === Sensor Camera ===
     
     private void CameraInit()
@@ -692,6 +828,79 @@ public class AUV : MonoBehaviour
         return sensorCamera != null ? sensorCamera.GetPreviewTexture() : null;
     }
 
+    private void AssignLocalSensorPointsIfMissing()
+    {
+        if (localMBESPoint == null)
+        {
+            localMBESPoint = FindChildByNames(MBESPointSearchNames);
+        }
+
+        if (localSideSonarLeftPoint == null)
+        {
+            localSideSonarLeftPoint = FindChildByNames(SideSonarLeftSearchNames);
+        }
+
+        if (localSideSonarRightPoint == null)
+        {
+            localSideSonarRightPoint = FindChildByNames(SideSonarRightSearchNames);
+        }
+    }
+
+    private Transform ResolveSensorTransform(Transform explicitTransform, string[] searchNames)
+    {
+        if (explicitTransform != null && explicitTransform.IsChildOf(transform))
+        {
+            return explicitTransform;
+        }
+
+        Transform localFoundTransform = FindChildByNames(searchNames);
+        return localFoundTransform != null ? localFoundTransform : transform;
+    }
+
+    private Transform FindChildByNames(string[] searchNames)
+    {
+        if (searchNames == null)
+        {
+            return null;
+        }
+
+        for (int i = 0; i < searchNames.Length; i++)
+        {
+            Transform foundTransform = FindChildRecursive(transform, searchNames[i]);
+            if (foundTransform != null)
+            {
+                return foundTransform;
+            }
+        }
+
+        return null;
+    }
+
+    private static Transform FindChildRecursive(Transform root, string childName)
+    {
+        if (root == null || string.IsNullOrWhiteSpace(childName))
+        {
+            return null;
+        }
+
+        for (int i = 0; i < root.childCount; i++)
+        {
+            Transform child = root.GetChild(i);
+            if (string.Equals(child.name, childName, System.StringComparison.OrdinalIgnoreCase))
+            {
+                return child;
+            }
+
+            Transform nestedChild = FindChildRecursive(child, childName);
+            if (nestedChild != null)
+            {
+                return nestedChild;
+            }
+        }
+
+        return null;
+    }
+
     // === SONARS ===
     /* Поддержка двух сонаров */
     /* Твой код */
@@ -752,6 +961,44 @@ public class AUV : MonoBehaviour
         return $"Camera: {info.width}x{info.height} | aspect {info.aspect:F2} | {projectionInfo} | near {info.nearClipPlane:F2} | far {info.farClipPlane:F1}";
     }
 
+    private string SideSonarStateText(SideSonarHit hit)
+    {
+        string state = hit.hasHit ? "HIT" : "MISS";
+        return $"State: {state}\nRange: {hit.range:F1} m\nIntensity: {hit.intensity:F2}";
+    }
+
+    private void DrawSideSonarPanel(Rect panelRect, string title, SideSonarHit hit, Color accentColor)
+    {
+        DrawFilledRect(panelRect, new Color(0.06f, 0.1f, 0.14f, 0.82f));
+
+        GUI.Label(new Rect(panelRect.x + 8f, panelRect.y + 10f, panelRect.width - 16f, 22f), title, uiCenteredTitleStyle);
+        GUI.Label(new Rect(panelRect.x + 10f, panelRect.y + 42f, panelRect.width - 20f, 72f), SideSonarStateText(hit), uiTextStyle);
+
+        float intensity = Mathf.Clamp01(hit.intensity);
+        Rect intensityTrackRect = new Rect(panelRect.x + 10f, panelRect.y + 124f, panelRect.width - 20f, 12f);
+        DrawFilledRect(intensityTrackRect, new Color(0.16f, 0.2f, 0.25f, 0.95f));
+        if (intensity > 0f)
+        {
+            Rect intensityFillRect = new Rect(intensityTrackRect.x, intensityTrackRect.y, intensityTrackRect.width * intensity, intensityTrackRect.height);
+            DrawFilledRect(intensityFillRect, accentColor);
+        }
+        GUI.Label(new Rect(intensityTrackRect.x, intensityTrackRect.yMax + 4f, intensityTrackRect.width, 20f), "Echo level", uiCenteredTextStyle);
+
+        float rangeRatio = Mathf.Clamp01(hit.range / Mathf.Max(0.1f, sideSonarMaxRange));
+        Rect rangeTrackRect = new Rect(panelRect.x + (panelRect.width * 0.5f) - 14f, panelRect.y + 176f, 28f, panelRect.height - 236f);
+        DrawFilledRect(rangeTrackRect, new Color(0.14f, 0.18f, 0.22f, 0.95f));
+
+        if (hit.hasHit)
+        {
+            float markerY = Mathf.Lerp(rangeTrackRect.y + 2f, rangeTrackRect.yMax - 6f, rangeRatio);
+            Rect markerRect = new Rect(rangeTrackRect.x - 6f, markerY, rangeTrackRect.width + 12f, 4f);
+            DrawFilledRect(markerRect, accentColor);
+        }
+
+        GUI.Label(new Rect(panelRect.x + 8f, rangeTrackRect.y - 18f, panelRect.width - 16f, 16f), "Near", uiCenteredTextStyle);
+        GUI.Label(new Rect(panelRect.x + 8f, rangeTrackRect.yMax + 2f, panelRect.width - 16f, 16f), $"Far {sideSonarMaxRange:F0} m", uiCenteredTextStyle);
+    }
+
     private void UIInit()
     {
         if (!UIOn) return;
@@ -792,6 +1039,18 @@ public class AUV : MonoBehaviour
             uiTextStyle.normal.textColor = new Color(0.9f, 0.95f, 1f, 1f);
         }
 
+        if (uiCenteredTitleStyle == null)
+        {
+            uiCenteredTitleStyle = new GUIStyle(uiTitleStyle);
+            uiCenteredTitleStyle.alignment = TextAnchor.UpperCenter;
+        }
+
+        if (uiCenteredTextStyle == null)
+        {
+            uiCenteredTextStyle = new GUIStyle(uiTextStyle);
+            uiCenteredTextStyle.alignment = TextAnchor.UpperCenter;
+        }
+
         EnsureMBESTexture();
     }
 
@@ -808,31 +1067,51 @@ public class AUV : MonoBehaviour
         Texture cameraPreview = GetCameraPreviewTexture();
 
         float margin = 16f;
-        float panelWidth = Mathf.Max(320f, Mathf.Min(Screen.width - (margin * 2f), 760f));
-        Rect panelRect = new Rect(margin, margin, panelWidth, 470f);
-        DrawFilledRect(panelRect, new Color(0.05f, 0.08f, 0.12f, 0.82f));
+        float gap = 12f;
+        float availableWidth = Screen.width - (margin * 2f);
+        if (availableWidth < 260f)
+        {
+            return;
+        }
 
-        GUI.Label(new Rect(panelRect.x + 12f, panelRect.y + 10f, panelRect.width - 24f, 22f), $"AUV #{id}", uiTitleStyle);
+        float minCenterWidth = 220f;
+        float maxSideWidth = Mathf.Max(80f, (availableWidth - minCenterWidth - (gap * 2f)) * 0.5f);
+        float sidePanelWidth = Mathf.Clamp(availableWidth * 0.18f, 80f, Mathf.Min(220f, maxSideWidth));
+        float centerPanelWidth = Mathf.Max(minCenterWidth, availableWidth - ((sidePanelWidth * 2f) + (gap * 2f)));
+        centerPanelWidth = Mathf.Min(centerPanelWidth, 760f);
+        sidePanelWidth = Mathf.Max(80f, (availableWidth - centerPanelWidth - (gap * 2f)) * 0.5f);
+        float panelHeight = 516f;
 
-        Rect mbesRect = new Rect(panelRect.x + 12f, panelRect.y + 36f, panelRect.width - 24f, 72f);
+        Rect leftSonarRect = new Rect(margin, margin, sidePanelWidth, panelHeight);
+        Rect centerRect = new Rect(leftSonarRect.xMax + gap, margin, centerPanelWidth, panelHeight);
+        Rect rightSonarRect = new Rect(centerRect.xMax + gap, margin, sidePanelWidth, panelHeight);
+
+        DrawSideSonarPanel(leftSonarRect, "Left Sonar", sideSonarLeftHit, new Color(0.27f, 0.71f, 0.95f, 0.95f));
+        DrawSideSonarPanel(rightSonarRect, "Right Sonar", sideSonarRightHit, new Color(0.42f, 0.86f, 0.74f, 0.95f));
+
+        DrawFilledRect(centerRect, new Color(0.05f, 0.08f, 0.12f, 0.82f));
+
+        GUI.Label(new Rect(centerRect.x + 12f, centerRect.y + 10f, centerRect.width - 24f, 22f), $"AUV #{id}", uiTitleStyle);
+
+        Rect mbesRect = new Rect(centerRect.x + 12f, centerRect.y + 36f, centerRect.width - 24f, 72f);
         DrawFilledRect(mbesRect, new Color(0.1f, 0.14f, 0.18f, 0.95f));
         if (mbesTexture != null)
         {
             GUI.DrawTexture(mbesRect, mbesTexture, ScaleMode.StretchToFill, false);
         }
 
-        GUI.Label(new Rect(mbesRect.x, mbesRect.yMax + 6f, panelRect.width - 24f, 36f), mbesText, uiTextStyle);
-        GUI.Label(new Rect(panelRect.x + 12f, panelRect.y + 138f, (panelRect.width * 0.5f) - 18f, 96f), motorText, uiTextStyle);
-        GUI.Label(new Rect(panelRect.x + (panelRect.width * 0.5f), panelRect.y + 138f, (panelRect.width * 0.5f) - 12f, 96f), positionText, uiTextStyle);
+        GUI.Label(new Rect(mbesRect.x, mbesRect.yMax + 6f, centerRect.width - 24f, 36f), mbesText, uiTextStyle);
+        GUI.Label(new Rect(centerRect.x + 12f, centerRect.y + 150f, (centerRect.width * 0.5f) - 18f, 96f), motorText, uiTextStyle);
+        GUI.Label(new Rect(centerRect.x + (centerRect.width * 0.5f), centerRect.y + 150f, (centerRect.width * 0.5f) - 12f, 96f), positionText, uiTextStyle);
 
-        Rect cameraRect = new Rect(panelRect.x + 12f, panelRect.y + 246f, panelRect.width - 24f, 180f);
+        Rect cameraRect = new Rect(centerRect.x + 12f, centerRect.y + 258f, centerRect.width - 24f, 208f);
         DrawFilledRect(cameraRect, new Color(0.07f, 0.1f, 0.14f, 0.95f));
         if (cameraPreview != null)
         {
             GUI.DrawTexture(cameraRect, cameraPreview, ScaleMode.ScaleToFit, false);
         }
 
-        GUI.Label(new Rect(cameraRect.x, cameraRect.yMax + 8f, panelRect.width - 24f, 28f), cameraText, uiTextStyle);
+        GUI.Label(new Rect(cameraRect.x, cameraRect.yMax + 8f, centerRect.width - 24f, 28f), cameraText, uiTextStyle);
     }
 
     private void DrawFilledRect(Rect rect, Color color)

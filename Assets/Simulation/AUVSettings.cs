@@ -10,8 +10,11 @@ public class AUVSettings : MonoBehaviour
     private const float DefaultMBESMaxRange = 200f;
     private static readonly Vector3 DefaultMBESLookDirection = Vector3.down;
     private static readonly Vector3 DefaultMBESSpanDirection = Vector3.right;
-    private const int DefaultCameraWidth = 512;
-    private const int DefaultCameraHeight = 512;
+    private const float DefaultSideSonarMaxRange = 200f;
+    private const float DefaultSideSonarDownAngleDegrees = 45f;
+    private const float DefaultSideSonarDistanceAttenuation = 0.05f;
+    private const int DefaultCameraWidth = 128;
+    private const int DefaultCameraHeight = 128;
     private const float DefaultCameraAspect = 1f;
     private const bool DefaultCameraOrthographic = true;
     private const float DefaultCameraOrthographicSize = 2f;
@@ -76,7 +79,6 @@ public class AUVSettings : MonoBehaviour
     [SerializeField] public int MBESPointsCount = DefaultMBESPointsCount; // количество точек
     [SerializeField] public int MBESDistance = DefaultMBESDistance; // ширина в метрах
     [SerializeField] public float MBESMaxRange = 200f; // максимальная длина луча
-    [SerializeField] public Transform MBESPoint; // точка для MBED
     [SerializeField] public Vector3 MBESLookDirection = new Vector3(0f, -1f, 0f); // куда смотрит центральный луч в локальных координатах MBESPoint
     [SerializeField] public Vector3 MBESSpanDirection = new Vector3(1f, 0f, 0f); // вдоль какой оси строится полоса в локальных координатах MBESPoint
     
@@ -92,10 +94,10 @@ public class AUVSettings : MonoBehaviour
     [SerializeField] private float cameraNearClipPlane = DefaultCameraNearClipPlane;
     [SerializeField] private float cameraFarClipPlane = DefaultCameraFarClipPlane;
     
-    [Header("Sonar #1")]
-    // сонар первый
-    [Header("Sonar #2")]
-    // сонар второй
+    [Header("Side Sonars")]
+    [SerializeField] public float SideSonarMaxRange = DefaultSideSonarMaxRange;
+    [SerializeField] public float SideSonarDownAngleDegrees = DefaultSideSonarDownAngleDegrees;
+    [SerializeField] public float SideSonarDistanceAttenuation = DefaultSideSonarDistanceAttenuation;
 
     // === Переменные класса ===
     private static AUVSettings shared;
@@ -210,6 +212,14 @@ public class AUVSettings : MonoBehaviour
             MBESSpanDirection = DefaultMBESSpanDirection;
         }
 
+        if (SideSonarMaxRange <= 0f)
+        {
+            SideSonarMaxRange = DefaultSideSonarMaxRange;
+        }
+
+        SideSonarDownAngleDegrees = Mathf.Clamp(SideSonarDownAngleDegrees, 1f, 89f);
+        SideSonarDistanceAttenuation = Mathf.Max(0f, SideSonarDistanceAttenuation);
+
         cameraWidth = Mathf.Max(16, cameraWidth);
         cameraHeight = Mathf.Max(16, cameraHeight);
         cameraDepthBufferBits = Mathf.Max(0, cameraDepthBufferBits);
@@ -246,6 +256,9 @@ public class AUVSettings : MonoBehaviour
         MBESMaxRange = DefaultMBESMaxRange;
         MBESLookDirection = DefaultMBESLookDirection;
         MBESSpanDirection = DefaultMBESSpanDirection;
+        SideSonarMaxRange = DefaultSideSonarMaxRange;
+        SideSonarDownAngleDegrees = DefaultSideSonarDownAngleDegrees;
+        SideSonarDistanceAttenuation = DefaultSideSonarDistanceAttenuation;
         cameraWidth = DefaultCameraWidth;
         cameraHeight = DefaultCameraHeight;
         cameraDepthBufferBits = 24;
