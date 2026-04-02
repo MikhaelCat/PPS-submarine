@@ -121,3 +121,5 @@ InitTestScene*.unity*
 *.mdb
 *.opendb
 *.VC.db
+
+*SimulationBaseSceneBuild-Miron/
