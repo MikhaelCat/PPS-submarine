@@ -35,6 +35,9 @@ public class MeshBuild : MonoBehaviour
         List<CombineInstance> combineInstances = new List<CombineInstance>();
         List<Material> materials = new List<Material>();
         HashSet<GameObject> sourceObjects = new HashSet<GameObject>();
+        HashSet<GameObject> candidateSourceObjects = new HashSet<GameObject>();
+        HashSet<MeshRenderer> candidateRenderers = new HashSet<MeshRenderer>();
+        HashSet<GameObject> unreadableSourceObjects = new HashSet<GameObject>();
         List<string> skippedUnreadableMeshes = new List<string>();
         HashSet<Transform> preservedRoots = GetPreservedRoots();
         Matrix4x4 rootWorldToLocal = transform.worldToLocalMatrix;
@@ -54,15 +57,19 @@ public class MeshBuild : MonoBehaviour
                 continue;
             }
 
-            if (!sourceMesh.isReadable)
-            {
-                skippedUnreadableMeshes.Add(meshFilter.name);
-                continue;
-            }
-
             MeshRenderer sourceRenderer = meshFilter.GetComponent<MeshRenderer>();
             if (sourceRenderer == null)
             {
+                continue;
+            }
+
+            candidateSourceObjects.Add(meshFilter.gameObject);
+            candidateRenderers.Add(sourceRenderer);
+
+            if (!sourceMesh.isReadable)
+            {
+                skippedUnreadableMeshes.Add(meshFilter.name);
+                unreadableSourceObjects.Add(meshFilter.gameObject);
                 continue;
             }
 
@@ -85,11 +92,20 @@ public class MeshBuild : MonoBehaviour
             sourceObjects.Add(meshFilter.gameObject);
         }
 
+        // Read/Write-disabled meshes cannot be combined, but must stay visible as regular renderers.
+        if (unreadableSourceObjects.Count > 0)
+        {
+            SetObjectsActive(unreadableSourceObjects, true);
+        }
+
         if (combineInstances.Count == 0)
         {
+            RestoreSourceGeometry(candidateSourceObjects, candidateRenderers);
+
             if (skippedUnreadableMeshes.Count > 0)
             {
-                Debug.LogWarning($"MeshBuild on {name} skipped {skippedUnreadableMeshes.Count} non-readable meshes. Keep source renderers enabled or turn on Read/Write for meshes that should be combined.", this);
+                Debug.LogWarning($"MeshBuild on {name} could not create a combined mesh because {skippedUnreadableMeshes.Count} source meshes are non-readable. Source renderers were restored, but a runtime combined mesh/collider will not exist until Read/Write is enabled on the model import. First unreadable mesh: {skippedUnreadableMeshes[0]}", this);
+                return;
             }
 
             Debug.LogWarning($"MeshBuild on {name} did not find child meshes to combine.", this);
@@ -115,6 +131,7 @@ public class MeshBuild : MonoBehaviour
         targetMeshFilter.sharedMesh = generatedMesh;
 
         MeshRenderer targetRenderer = GetComponent<MeshRenderer>();
+        targetRenderer.enabled = true;
         targetRenderer.sharedMaterials = materials.ToArray();
 
         if (rebuildMeshCollider)
@@ -139,6 +156,59 @@ public class MeshBuild : MonoBehaviour
         }
 
         isBuilt = true;
+    }
+
+    private static void SetObjectsActive(HashSet<GameObject> objects, bool active)
+    {
+        if (objects == null || objects.Count == 0)
+        {
+            return;
+        }
+
+        foreach (GameObject sourceObject in objects)
+        {
+            if (sourceObject != null && sourceObject.activeSelf != active)
+            {
+                sourceObject.SetActive(active);
+            }
+        }
+    }
+
+    private static void SetRenderersEnabled(HashSet<MeshRenderer> renderers, bool enabled)
+    {
+        if (renderers == null || renderers.Count == 0)
+        {
+            return;
+        }
+
+        foreach (MeshRenderer renderer in renderers)
+        {
+            if (renderer != null && renderer.enabled != enabled)
+            {
+                renderer.enabled = enabled;
+            }
+        }
+    }
+
+    private void RestoreSourceGeometry(HashSet<GameObject> sourceObjects, HashSet<MeshRenderer> sourceRenderers)
+    {
+        SetObjectsActive(sourceObjects, true);
+        SetRenderersEnabled(sourceRenderers, true);
+
+        MeshFilter targetMeshFilter = GetComponent<MeshFilter>();
+        if (targetMeshFilter != null)
+        {
+            targetMeshFilter.sharedMesh = null;
+        }
+
+        MeshRenderer targetRenderer = GetComponent<MeshRenderer>();
+        if (targetRenderer != null)
+        {
+            targetRenderer.sharedMaterials = new Material[0];
+            targetRenderer.enabled = false;
+        }
+
+        isBuilt = false;
     }
 
     private HashSet<Transform> GetPreservedRoots()
