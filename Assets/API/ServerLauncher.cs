@@ -214,6 +214,79 @@ public class ServerLauncher : MonoBehaviour
             }
         });
 
+        _server.AddRequest("spawn_auv", (values) => {
+            try
+            {
+                auvController.GetAPISpawnTransform(out Vector3 basePos, out Vector3 baseRot);
+                if (auvController.TrySpawnAUV(out int newAuvId))
+                {
+                    Vector3 offsetPos = basePos + new Vector3(newAuvId * 5.0f, 0, 0);
+                    AUV[] allAuvs = FindObjectsByType<AUV>(FindObjectsInactive.Exclude);
+                    foreach (var auv in allAuvs)
+                    {
+                        if (auv.id == newAuvId)
+                        {
+                            auv.transform.position = offsetPos;
+                            auv.transform.eulerAngles = baseRot;
+                            break;
+                        }
+                    }
+
+                    return Task.FromResult<(int, string, object)>((200, "Success", (object)new { spawned_id = newAuvId }));
+                }
+                else
+                {
+                    return Task.FromResult<(int, string, object)>((500, "Failed to spawn AUV. Check AUVControllerManager.", null));
+                }
+            }
+            catch (Exception ex)
+            {
+                return Task.FromResult<(int, string, object)>((400, ex.Message, null));
+            }
+        });
+
+        _server.AddRequest("reset_auv", (values) => {
+            try
+            {
+                int auvId = Convert.ToInt32(values["auv_id"]);
+                AUV targetAuv = null;
+
+                AUV[] allAuvs = FindObjectsByType<AUV>(FindObjectsInactive.Exclude);
+                foreach (var a in allAuvs) { if (a.id == auvId) { targetAuv = a; break; } }
+
+                if (targetAuv == null) return Task.FromResult<(int, string, object)>((404, "AUV not found", null));
+
+                auvController.GetAPISpawnTransform(out Vector3 basePos, out Vector3 baseRot);
+                Vector3 offsetPos = basePos + new Vector3(auvId * 5.0f, 0, 0);
+
+                Rigidbody rb = targetAuv.GetComponent<Rigidbody>();
+                if (rb != null)
+                {
+                    // КРИТИЧЕСКИЙ МОМЕНТ: временно отключаем физику для телепортации
+                    rb.isKinematic = true;
+                    rb.linearVelocity = Vector3.zero;
+                    rb.angularVelocity = Vector3.zero;
+                }
+
+                // Сброс моторов
+                var motorIds = auvController.GetAUVMotorIds(auvId);
+                foreach (var mId in motorIds) auvController.SetAUVMotorSpeed(auvId, mId, 0f);
+
+                // Перемещение
+                targetAuv.transform.position = offsetPos;
+                targetAuv.transform.rotation = Quaternion.Euler(baseRot);
+
+                if (rb != null)
+                {
+                    // Возвращаем физику обратно
+                    rb.isKinematic = false;
+                }
+
+                return Task.FromResult<(int, string, object)>((200, "Success", (object)new { reset_id = auvId }));
+            }
+            catch (Exception ex) { return Task.FromResult<(int, string, object)>((400, ex.Message, null)); }
+        });
+
         _server.Start();
     }
 
