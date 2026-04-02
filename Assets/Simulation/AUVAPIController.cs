@@ -84,6 +84,9 @@ public class AUVAPIController : MonoBehaviour
     private Dictionary<int, MBESData> mbesByAuvId = new Dictionary<int, MBESData>();
     private Dictionary<int, SideSonarData> sideSonarByAuvId = new Dictionary<int, SideSonarData>();
     private Dictionary<int, AUVCameraData> cameraByAuvId = new Dictionary<int, AUVCameraData>();
+    [SerializeField] private AUVControllerManager controllerManager;
+    [SerializeField] private Vector3 apiSpawnWorldPosition = new Vector3(0f, 50f, 0f);
+    [SerializeField] private Vector3 apiSpawnWorldEulerAngles = Vector3.zero;
     private long nextSnapshotSequence = 1;
 
     // === Unity жизненный цикл ===
@@ -244,6 +247,53 @@ public class AUVAPIController : MonoBehaviour
         return false;
     }
 
+    // Создает AUV через AUVControllerManager с его настройками спавна из Inspector.
+    public bool TrySpawnAUV(out int spawnedAuvId)
+    {
+        return TrySpawnAUVAt(apiSpawnWorldPosition, apiSpawnWorldEulerAngles, out spawnedAuvId);
+    }
+
+    // Создает AUV в заданной мировой позиции/ориентации.
+    public bool TrySpawnAUVAt(Vector3 worldPosition, Vector3 worldEulerAngles, out int spawnedAuvId)
+    {
+        spawnedAuvId = -1;
+        if (!TryGetControllerManager(out AUVControllerManager manager))
+        {
+            return false;
+        }
+
+        Quaternion worldRotation = Quaternion.Euler(worldEulerAngles);
+        if (!manager.TrySpawnAUVAt(worldPosition, worldRotation, out AUV spawnedAuv) || spawnedAuv == null)
+        {
+            return false;
+        }
+
+        spawnedAuvId = spawnedAuv.id;
+        RefreshSnapshotsAfterSpawn();
+        return true;
+    }
+
+    // Перегрузка для внешних API-клиентов, где удобнее передавать числа по отдельности.
+    public bool TrySpawnAUVAt(float x, float y, float z, float pitch, float yaw, float roll, out int spawnedAuvId)
+    {
+        Vector3 worldPosition = new Vector3(x, y, z);
+        Vector3 worldEulerAngles = new Vector3(pitch, yaw, roll);
+        return TrySpawnAUVAt(worldPosition, worldEulerAngles, out spawnedAuvId);
+    }
+
+    // Обновляет точку/ориентацию спавна, используемые TrySpawnAUV(out int).
+    public void SetAPISpawnTransform(Vector3 worldPosition, Vector3 worldEulerAngles)
+    {
+        apiSpawnWorldPosition = worldPosition;
+        apiSpawnWorldEulerAngles = worldEulerAngles;
+    }
+
+    public void GetAPISpawnTransform(out Vector3 worldPosition, out Vector3 worldEulerAngles)
+    {
+        worldPosition = apiSpawnWorldPosition;
+        worldEulerAngles = apiSpawnWorldEulerAngles;
+    }
+
     // === Вспомогательные функции ===
 
     // Забирает id моторов из общих настроек AUV
@@ -260,6 +310,32 @@ public class AUVAPIController : MonoBehaviour
             .Distinct()
             .OrderBy(id => id)
             .ToList();
+    }
+
+    private bool TryGetControllerManager(out AUVControllerManager manager)
+    {
+        manager = controllerManager;
+        if (manager == null)
+        {
+            manager = UnityEngine.Object.FindAnyObjectByType<AUVControllerManager>();
+            controllerManager = manager;
+        }
+
+        if (manager == null)
+        {
+            Debug.LogWarning("AUVAPIController: AUVControllerManager not found in scene.");
+            return false;
+        }
+
+        return true;
+    }
+
+    private void RefreshSnapshotsAfterSpawn()
+    {
+        RefreshAUVCache();
+        RefreshMBESSnapshots();
+        RefreshSideSonarSnapshots();
+        RefreshCameraSnapshots();
     }
 
     // Пересобирает словарь id->AUV

@@ -35,6 +35,7 @@ public class MeshBuild : MonoBehaviour
         List<CombineInstance> combineInstances = new List<CombineInstance>();
         List<Material> materials = new List<Material>();
         HashSet<GameObject> sourceObjects = new HashSet<GameObject>();
+        List<string> skippedUnreadableMeshes = new List<string>();
         HashSet<Transform> preservedRoots = GetPreservedRoots();
         Matrix4x4 rootWorldToLocal = transform.worldToLocalMatrix;
         int totalVertexCount = 0;
@@ -50,6 +51,12 @@ public class MeshBuild : MonoBehaviour
             Mesh sourceMesh = meshFilter.sharedMesh;
             if (sourceMesh == null)
             {
+                continue;
+            }
+
+            if (!sourceMesh.isReadable)
+            {
+                skippedUnreadableMeshes.Add(meshFilter.name);
                 continue;
             }
 
@@ -80,6 +87,11 @@ public class MeshBuild : MonoBehaviour
 
         if (combineInstances.Count == 0)
         {
+            if (skippedUnreadableMeshes.Count > 0)
+            {
+                Debug.LogWarning($"MeshBuild on {name} skipped {skippedUnreadableMeshes.Count} non-readable meshes. Keep source renderers enabled or turn on Read/Write for meshes that should be combined.", this);
+            }
+
             Debug.LogWarning($"MeshBuild on {name} did not find child meshes to combine.", this);
             return;
         }
@@ -119,6 +131,11 @@ public class MeshBuild : MonoBehaviour
                     sourceObject.SetActive(false);
                 }
             }
+        }
+
+        if (skippedUnreadableMeshes.Count > 0)
+        {
+            Debug.LogWarning($"MeshBuild on {name} skipped {skippedUnreadableMeshes.Count} non-readable meshes. They were left as separate renderers.", this);
         }
 
         isBuilt = true;

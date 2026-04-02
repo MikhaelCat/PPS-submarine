@@ -1449,7 +1449,7 @@ Rigidbody:
   m_ImplicitCom: 0
   m_ImplicitTensor: 1
   m_UseGravity: 1
-  m_IsKinematic: 1
+  m_IsKinematic: 0
   m_Interpolate: 0
   m_Constraints: 0
   m_CollisionDetection: 0
@@ -1575,7 +1575,7 @@ MeshCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 5
-  m_Convex: 0
+  m_Convex: 1
   m_CookingOptions: 30
   m_Mesh: {fileID: 0}
 --- !u!114 &7077324259612366897
@@ -1607,11 +1607,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AUVAnimation
   auv: {fileID: 453636208980510970}
-  animationSettings: {fileID: 0}
+  animationSettings: {fileID: 2371997389989290419}
   topFrontMotorPart: {fileID: 7516882424173814336}
   topRearMotorPart: {fileID: 1941634520040878141}
-  sideLeftMotorPart: {fileID: 1495682931322144433}
-  sideRightMotorPart: {fileID: 8593436980304294330}
+  sideLeftMotorPart: {fileID: 8593436980304294330}
+  sideRightMotorPart: {fileID: 1495682931322144433}
   maxDegreesPerSecond: 1440
 --- !u!114 &2371997389989290419
 MonoBehaviour:

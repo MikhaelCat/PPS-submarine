@@ -12,6 +12,13 @@ public class AUVControllerManager : MonoBehaviour
     [SerializeField] InputActionAsset InputActions;
     [SerializeField] string ActionMapName = "AUV";
     [SerializeField] OrbitCamera OrbitCamera;
+
+    [Header("Spawn")]
+    [SerializeField] AUV SpawnPrefab;
+    [SerializeField] Transform SpawnParent;
+    [SerializeField] Vector3 SpawnWorldPosition = new Vector3(0f, 50f, 0f);
+    [SerializeField] Vector3 SpawnWorldEulerAngles = Vector3.zero;
+    [SerializeField] bool FocusSpawnedAUV = true;
     
     [System.Serializable]
     public struct IdAndForce
@@ -208,6 +215,9 @@ public class AUVControllerManager : MonoBehaviour
     {
         DefaultIncluded = false;
         ActionMapName = "AUV";
+        SpawnWorldPosition = new Vector3(0f, 50f, 0f);
+        SpawnWorldEulerAngles = Vector3.zero;
+        FocusSpawnedAUV = true;
         ApplyDefaultManualMappings();
     }
 
@@ -272,6 +282,8 @@ public class AUVControllerManager : MonoBehaviour
     // Главный цикл ручного управления
     void Update()
     {
+        HandleSpawnShortcut();
+
         bool hadAuvBeforeUpdate = currentAuvId >= 0;
         if (!TryGetCurrentAUV(out AUV currentAuv))
         {
@@ -320,6 +332,77 @@ public class AUVControllerManager : MonoBehaviour
         {
             currentAuv.SetAllMotorForces(0f);
         }
+    }
+
+    // === Спавн AUV ===
+
+    private void HandleSpawnShortcut()
+    {
+        if (!IsSpawnShortcutPressed())
+        {
+            return;
+        }
+
+        TrySpawnAUVFromPrefab();
+    }
+
+    private static bool IsSpawnShortcutPressed()
+    {
+        Keyboard keyboard = Keyboard.current;
+        if (keyboard == null || !keyboard.nKey.wasPressedThisFrame)
+        {
+            return false;
+        }
+
+        return keyboard.leftCtrlKey.isPressed || keyboard.rightCtrlKey.isPressed;
+    }
+
+    public bool TrySpawnAUVFromPrefab()
+    {
+        return TrySpawnAUVFromPrefab(out _);
+    }
+
+    public bool TrySpawnAUVFromPrefab(out AUV spawnedAuv)
+    {
+        Quaternion spawnRotation = Quaternion.Euler(SpawnWorldEulerAngles);
+        return TrySpawnAUVAt(SpawnWorldPosition, spawnRotation, out spawnedAuv);
+    }
+
+    public bool TrySpawnAUVAt(Vector3 worldPosition, Quaternion worldRotation, out AUV spawnedAuv)
+    {
+        spawnedAuv = null;
+        if (SpawnPrefab == null)
+        {
+            Debug.LogWarning("AUVControllerManager: SpawnPrefab is not assigned.", this);
+            return false;
+        }
+
+        AUV previousAuv = null;
+        if (TryGetCurrentAUV(out AUV currentAuv))
+        {
+            previousAuv = currentAuv;
+        }
+
+        spawnedAuv = Instantiate(SpawnPrefab, worldPosition, worldRotation, SpawnParent);
+        if (spawnedAuv == null)
+        {
+            Debug.LogError("AUVControllerManager: Failed to instantiate SpawnPrefab.", this);
+            return false;
+        }
+
+        if (previousAuv != null)
+        {
+            previousAuv.SetAllMotorForces(0f);
+        }
+
+        RefreshAUVs();
+
+        if (FocusSpawnedAUV && TrySetCurrentAUVById(spawnedAuv.id))
+        {
+            SetOrbitTargetToCurrentAUV();
+        }
+
+        return true;
     }
 
     // === Инициализация input ===
@@ -434,6 +517,31 @@ public class AUVControllerManager : MonoBehaviour
         }
 
         currentAuvId = controlledAUVs[currentAuvIndex] != null ? controlledAUVs[currentAuvIndex].id : -1;
+    }
+
+    private bool TrySetCurrentAUVById(int auvId)
+    {
+        if (auvId < 0)
+        {
+            return false;
+        }
+
+        if (controlledAUVs == null || controlledAUVs.Length == 0)
+        {
+            RefreshAUVs();
+        }
+
+        for (int i = 0; i < controlledAUVs.Length; i++)
+        {
+            if (controlledAUVs[i] != null && controlledAUVs[i].id == auvId)
+            {
+                currentAuvIndex = i;
+                currentAuvId = auvId;
+                return true;
+            }
+        }
+
+        return false;
     }
 
     // Переключает управление на следующий AUV
