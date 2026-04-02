@@ -1286,6 +1286,8 @@ MonoBehaviour:
   applyLegacyInertiaTensor: 1
   inertiaTensor: {x: 3333.3333, y: 1666.6666, z: 3333.3333}
   useMotorForcePoints: 1
+  disableMotorForceOutOfWater: 1
+  motorWaterBlendSpeed: 12
   UIOn: 1
   localMBESPoint: {fileID: 2134613619}
   localSideSonarLeftPoint: {fileID: 1994522409}
@@ -1500,7 +1502,7 @@ Transform:
   m_GameObject: {fileID: 819549142}
   serializedVersion: 2
   m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 0, y: -2, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -2578,6 +2580,8 @@ MonoBehaviour:
   cameraNearClipPlane: 0.3
   cameraFarClipPlane: 100
   SideSonarMaxRange: 200
+  SideSonarPointsPerSide: 512
+  SideSonarSwathPerSide: 100
   SideSonarDownAngleDegrees: 45
   SideSonarDistanceAttenuation: 0.05
 --- !u!114 &1479718063

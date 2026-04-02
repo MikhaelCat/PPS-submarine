@@ -30,6 +30,33 @@ public class AUVAPIController : MonoBehaviour
         public bool IsValid => points != null;
     }
 
+    public struct SideSonarPointReading
+    {
+        public bool hasHit;
+        public float slantRange;
+        public float horizontalRange;
+        public float intensity;
+        public Vector3 pointWorld;
+        public Vector3 pointLocal;
+        public Vector3 normalWorld;
+    }
+
+    public struct SideSonarData
+    {
+        public int auvId;
+        public int pointsPerSide;
+        public int leftHitCount;
+        public int rightHitCount;
+        public float swathPerSide;
+        public float maxRange;
+        public float capturedAtTime;
+        public long sequence;
+        public SideSonarPointReading[] leftLine;
+        public SideSonarPointReading[] rightLine;
+
+        public bool IsValid => leftLine != null && rightLine != null;
+    }
+
     public struct AUVCameraData
     {
         public int auvId;
@@ -55,6 +82,7 @@ public class AUVAPIController : MonoBehaviour
     private readonly object stateLock = new object();
     private Dictionary<int, AUV> auvByIdSnapshot = new Dictionary<int, AUV>();
     private Dictionary<int, MBESData> mbesByAuvId = new Dictionary<int, MBESData>();
+    private Dictionary<int, SideSonarData> sideSonarByAuvId = new Dictionary<int, SideSonarData>();
     private Dictionary<int, AUVCameraData> cameraByAuvId = new Dictionary<int, AUVCameraData>();
     private long nextSnapshotSequence = 1;
 
@@ -65,6 +93,7 @@ public class AUVAPIController : MonoBehaviour
     {
         RefreshAUVCache();
         RefreshMBESSnapshots();
+        RefreshSideSonarSnapshots();
         RefreshCameraSnapshots();
     }
 
@@ -72,6 +101,7 @@ public class AUVAPIController : MonoBehaviour
     {
         RefreshAUVCache();
         RefreshMBESSnapshots();
+        RefreshSideSonarSnapshots();
         RefreshCameraSnapshots();
     }
 
@@ -147,6 +177,37 @@ public class AUVAPIController : MonoBehaviour
         }
 
         points = Array.Empty<MBESPointReading>();
+        return false;
+    }
+
+    // Возвращает последний потокобезопасный снимок бокового гидролокатора для конкретного AUV.
+    // leftLine/rightLine представляют строчки теневой картинки по левому и правому борту.
+    public bool TryGetAUVSideSonarData(int auv_id, out SideSonarData sideSonarData)
+    {
+        lock (stateLock)
+        {
+            if (!sideSonarByAuvId.TryGetValue(auv_id, out SideSonarData cachedData) || !cachedData.IsValid)
+            {
+                sideSonarData = default;
+                return false;
+            }
+
+            sideSonarData = CloneSideSonarData(cachedData);
+            return true;
+        }
+    }
+
+    public bool TryGetAUVSideSonarLines(int auv_id, out SideSonarPointReading[] leftLine, out SideSonarPointReading[] rightLine)
+    {
+        if (TryGetAUVSideSonarData(auv_id, out SideSonarData data))
+        {
+            leftLine = data.leftLine;
+            rightLine = data.rightLine;
+            return true;
+        }
+
+        leftLine = Array.Empty<SideSonarPointReading>();
+        rightLine = Array.Empty<SideSonarPointReading>();
         return false;
     }
 
@@ -249,6 +310,27 @@ public class AUVAPIController : MonoBehaviour
         lock (stateLock)
         {
             mbesByAuvId = freshSnapshots;
+        }
+    }
+
+    private void RefreshSideSonarSnapshots()
+    {
+        Dictionary<int, SideSonarData> freshSnapshots = new Dictionary<int, SideSonarData>(auvById.Count);
+
+        foreach (KeyValuePair<int, AUV> pair in auvById)
+        {
+            AUV auv = pair.Value;
+            if (auv == null)
+            {
+                continue;
+            }
+
+            freshSnapshots[pair.Key] = BuildSideSonarSnapshot(auv);
+        }
+
+        lock (stateLock)
+        {
+            sideSonarByAuvId = freshSnapshots;
         }
     }
 
@@ -361,6 +443,71 @@ public class AUVAPIController : MonoBehaviour
         };
     }
 
+    private SideSonarData BuildSideSonarSnapshot(AUV auv)
+    {
+        int pointsPerSide = Mathf.Max(0, auv.GetSideSonarPointCount());
+        SideSonarPointReading[] leftLine = new SideSonarPointReading[pointsPerSide];
+        SideSonarPointReading[] rightLine = new SideSonarPointReading[pointsPerSide];
+
+        int leftHitCount = 0;
+        int rightHitCount = 0;
+
+        for (int i = 0; i < pointsPerSide; i++)
+        {
+            if (auv.TryGetSideSonarHit(AUV.SideSonarSide.Left, i, out AUV.SideSonarHit leftHit))
+            {
+                leftLine[i] = new SideSonarPointReading
+                {
+                    hasHit = leftHit.hasHit,
+                    slantRange = leftHit.range,
+                    horizontalRange = leftHit.horizontalRange,
+                    intensity = leftHit.intensity,
+                    pointWorld = leftHit.pointWorld,
+                    pointLocal = leftHit.pointLocal,
+                    normalWorld = leftHit.normalWorld
+                };
+
+                if (leftHit.hasHit)
+                {
+                    leftHitCount++;
+                }
+            }
+
+            if (auv.TryGetSideSonarHit(AUV.SideSonarSide.Right, i, out AUV.SideSonarHit rightHit))
+            {
+                rightLine[i] = new SideSonarPointReading
+                {
+                    hasHit = rightHit.hasHit,
+                    slantRange = rightHit.range,
+                    horizontalRange = rightHit.horizontalRange,
+                    intensity = rightHit.intensity,
+                    pointWorld = rightHit.pointWorld,
+                    pointLocal = rightHit.pointLocal,
+                    normalWorld = rightHit.normalWorld
+                };
+
+                if (rightHit.hasHit)
+                {
+                    rightHitCount++;
+                }
+            }
+        }
+
+        return new SideSonarData
+        {
+            auvId = auv.id,
+            pointsPerSide = pointsPerSide,
+            leftHitCount = leftHitCount,
+            rightHitCount = rightHitCount,
+            swathPerSide = auv.GetSideSonarSwathPerSide(),
+            maxRange = auv.GetSideSonarMaxRange(),
+            capturedAtTime = Time.time,
+            sequence = nextSnapshotSequence++,
+            leftLine = leftLine,
+            rightLine = rightLine
+        };
+    }
+
     private static MBESData CloneMBESData(MBESData source)
     {
         return new MBESData
@@ -373,6 +520,23 @@ public class AUVAPIController : MonoBehaviour
             capturedAtTime = source.capturedAtTime,
             sequence = source.sequence,
             points = source.points != null ? (MBESPointReading[])source.points.Clone() : Array.Empty<MBESPointReading>()
+        };
+    }
+
+    private static SideSonarData CloneSideSonarData(SideSonarData source)
+    {
+        return new SideSonarData
+        {
+            auvId = source.auvId,
+            pointsPerSide = source.pointsPerSide,
+            leftHitCount = source.leftHitCount,
+            rightHitCount = source.rightHitCount,
+            swathPerSide = source.swathPerSide,
+            maxRange = source.maxRange,
+            capturedAtTime = source.capturedAtTime,
+            sequence = source.sequence,
+            leftLine = source.leftLine != null ? (SideSonarPointReading[])source.leftLine.Clone() : Array.Empty<SideSonarPointReading>(),
+            rightLine = source.rightLine != null ? (SideSonarPointReading[])source.rightLine.Clone() : Array.Empty<SideSonarPointReading>()
         };
     }
 

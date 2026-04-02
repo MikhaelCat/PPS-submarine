@@ -11,6 +11,8 @@ public class AUVSettings : MonoBehaviour
     private static readonly Vector3 DefaultMBESLookDirection = Vector3.down;
     private static readonly Vector3 DefaultMBESSpanDirection = Vector3.right;
     private const float DefaultSideSonarMaxRange = 200f;
+    private const int DefaultSideSonarPointsPerSide = 512;
+    private const float DefaultSideSonarSwathPerSide = 100f;
     private const float DefaultSideSonarDownAngleDegrees = 45f;
     private const float DefaultSideSonarDistanceAttenuation = 0.05f;
     private const int DefaultCameraWidth = 128;
@@ -96,6 +98,8 @@ public class AUVSettings : MonoBehaviour
     
     [Header("Side Sonars")]
     [SerializeField] public float SideSonarMaxRange = DefaultSideSonarMaxRange;
+    [SerializeField] public int SideSonarPointsPerSide = DefaultSideSonarPointsPerSide;
+    [SerializeField] public float SideSonarSwathPerSide = DefaultSideSonarSwathPerSide;
     [SerializeField] public float SideSonarDownAngleDegrees = DefaultSideSonarDownAngleDegrees;
     [SerializeField] public float SideSonarDistanceAttenuation = DefaultSideSonarDistanceAttenuation;
 
@@ -217,6 +221,8 @@ public class AUVSettings : MonoBehaviour
             SideSonarMaxRange = DefaultSideSonarMaxRange;
         }
 
+        SideSonarPointsPerSide = Mathf.Max(8, SideSonarPointsPerSide);
+        SideSonarSwathPerSide = Mathf.Max(1f, SideSonarSwathPerSide);
         SideSonarDownAngleDegrees = Mathf.Clamp(SideSonarDownAngleDegrees, 1f, 89f);
         SideSonarDistanceAttenuation = Mathf.Max(0f, SideSonarDistanceAttenuation);
 
@@ -257,6 +263,8 @@ public class AUVSettings : MonoBehaviour
         MBESLookDirection = DefaultMBESLookDirection;
         MBESSpanDirection = DefaultMBESSpanDirection;
         SideSonarMaxRange = DefaultSideSonarMaxRange;
+        SideSonarPointsPerSide = DefaultSideSonarPointsPerSide;
+        SideSonarSwathPerSide = DefaultSideSonarSwathPerSide;
         SideSonarDownAngleDegrees = DefaultSideSonarDownAngleDegrees;
         SideSonarDistanceAttenuation = DefaultSideSonarDistanceAttenuation;
         cameraWidth = DefaultCameraWidth;

@@ -59,7 +59,9 @@ Shader "Simulation/FullScreen Water"
                 half4 sceneColor = SAMPLE_TEXTURE2D_X(_BlitTexture, sampler_LinearClamp, uv);
 
                 float rawDepth = SampleSceneDepth(uv);
-                float cameraUnderwater = _WorldSpaceCameraPos.y < _YTreshold ? 1.0 : 0.0;
+                // Camera world position (independent from any parent/local transform).
+                float3 cameraWorldPos = mul(UNITY_MATRIX_I_V, float4(0.0, 0.0, 0.0, 1.0)).xyz;
+                float cameraUnderwater = cameraWorldPos.y < _YTreshold ? 1.0 : 0.0;
 
                 float depthMeters = GetRawEyeDepth(rawDepth);
                 float hasGeometry;
@@ -68,8 +70,11 @@ Shader "Simulation/FullScreen Water"
             #else
                 hasGeometry = rawDepth < 0.9999 ? 1.0 : 0.0;
             #endif
-                // Sky/background has no depth hit, so treat it as the camera far plane distance.
-                depthMeters = lerp(_ProjectionParams.z, depthMeters, hasGeometry);
+                // Sky/background has no depth hit.
+                // Use at least FogFar for background so underwater "infinite sea" look
+                // is stable even for cameras with short far clip (e.g. AUVCamera).
+                float backgroundDepthMeters = max(_ProjectionParams.z, _FogFar);
+                depthMeters = lerp(backgroundDepthMeters, depthMeters, hasGeometry);
 
                 float fogSpanMeters = max(_FogFar - _FogNear, 0.001);
                 float fogDistanceMeters = max(depthMeters - _FogNear, 0.0);
