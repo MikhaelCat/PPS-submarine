@@ -1,12 +1,17 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
+using System.Threading;
 using UnityEngine;
 
 
 // ДОЛГАЯ ПОДДЕРЖКА ФУНКЦИЙ ячозвфршыв-ршфрш-ыв-=гфо=вы
 public class AUVAPIController : MonoBehaviour
 {
+    private const float FallbackSnapshotRefreshRateHz = 35f;
+    private const float SensorDemandKeepAliveSeconds = 2f;
+
     public struct MBESPointReading
     {
         public bool hasHit;
@@ -72,40 +77,84 @@ public class AUVAPIController : MonoBehaviour
         public Quaternion worldRotation;
         public float capturedAtTime;
         public long sequence;
-        public byte[] rgba32;
+        public ReadOnlyMemory<byte> rgba32;
 
-        public bool IsValid => rgba32 != null && rgba32.Length > 0 && width > 0 && height > 0;
+        public bool IsValid => !rgba32.IsEmpty && width > 0 && height > 0;
+    }
+
+    private struct TeleportRequest
+    {
+        public int auvId;
+        public Vector3 worldPosition;
+        public Vector3 worldEulerAngles;
     }
 
     // === Переменные класса ===
     private readonly Dictionary<int, AUV> auvById = new Dictionary<int, AUV>();
     private readonly object stateLock = new object();
+    private readonly object commandQueueLock = new object();
     private Dictionary<int, AUV> auvByIdSnapshot = new Dictionary<int, AUV>();
     private Dictionary<int, MBESData> mbesByAuvId = new Dictionary<int, MBESData>();
     private Dictionary<int, SideSonarData> sideSonarByAuvId = new Dictionary<int, SideSonarData>();
-    private Dictionary<int, AUVCameraData> cameraByAuvId = new Dictionary<int, AUVCameraData>();
+    private readonly Queue<TeleportRequest> pendingTeleportRequests = new Queue<TeleportRequest>();
     [SerializeField] private AUVControllerManager controllerManager;
     [SerializeField] private Vector3 apiSpawnWorldPosition = new Vector3(0f, 50f, 0f);
     [SerializeField] private Vector3 apiSpawnWorldEulerAngles = Vector3.zero;
     private long nextSnapshotSequence = 1;
+    private float snapshotRefreshInterval = 1f / FallbackSnapshotRefreshRateHz;
+    private float snapshotRefreshTimer = 0f;
+    private long mbesDemandTicks = 0;
+    private long sideSonarDemandTicks = 0;
 
     // === Unity жизненный цикл ===
 
     // Собирает кэш всех AUV при старте
     private void Awake()
     {
+        AUV.Registered += OnAUVRegistered;
+        AUV.Unregistered += OnAUVUnregistered;
+        ConfigureSnapshotRefreshInterval();
         RefreshAUVCache();
         RefreshMBESSnapshots();
         RefreshSideSonarSnapshots();
-        RefreshCameraSnapshots();
     }
 
     private void LateUpdate()
     {
-        RefreshAUVCache();
-        RefreshMBESSnapshots();
-        RefreshSideSonarSnapshots();
-        RefreshCameraSnapshots();
+        if (snapshotRefreshInterval <= 0f)
+        {
+            RefreshMBESSnapshots();
+            RefreshSideSonarSnapshots();
+            return;
+        }
+
+        snapshotRefreshTimer += Time.deltaTime;
+        if (snapshotRefreshTimer < snapshotRefreshInterval)
+        {
+            return;
+        }
+
+        snapshotRefreshTimer -= snapshotRefreshInterval;
+        if (IsDemandActive(ref mbesDemandTicks))
+        {
+            RefreshMBESSnapshots();
+        }
+
+        if (IsDemandActive(ref sideSonarDemandTicks))
+        {
+            RefreshSideSonarSnapshots();
+        }
+    }
+
+    private void FixedUpdate()
+    {
+        ProcessQueuedCommands();
+    }
+
+    private void OnDestroy()
+    {
+        AUV.Registered -= OnAUVRegistered;
+        AUV.Unregistered -= OnAUVUnregistered;
     }
 
     // === Публичный API ===
@@ -125,8 +174,6 @@ public class AUVAPIController : MonoBehaviour
     // Возвращает список id всех AUV в сцене
     public List<int> GetAUVs()
     {
-        RefreshAUVCache();
-
         lock (stateLock)
         {
             return auvByIdSnapshot.Keys.OrderBy(id => id).ToList();
@@ -156,6 +203,8 @@ public class AUVAPIController : MonoBehaviour
     // а читает только ранее подготовленную копию данных.
     public bool TryGetAUVMBESData(int auv_id, out MBESData mbesData)
     {
+        MarkMBESDemand();
+
         lock (stateLock)
         {
             if (!mbesByAuvId.TryGetValue(auv_id, out MBESData cachedData) || cachedData.points == null)
@@ -173,6 +222,8 @@ public class AUVAPIController : MonoBehaviour
     // Массив также является копией и безопасен для использования в другом потоке.
     public bool TryGetAUVMBESPoints(int auv_id, out MBESPointReading[] points)
     {
+        MarkMBESDemand();
+
         if (TryGetAUVMBESData(auv_id, out MBESData data))
         {
             points = data.points;
@@ -187,6 +238,8 @@ public class AUVAPIController : MonoBehaviour
     // leftLine/rightLine представляют строчки теневой картинки по левому и правому борту.
     public bool TryGetAUVSideSonarData(int auv_id, out SideSonarData sideSonarData)
     {
+        MarkSideSonarDemand();
+
         lock (stateLock)
         {
             if (!sideSonarByAuvId.TryGetValue(auv_id, out SideSonarData cachedData) || !cachedData.IsValid)
@@ -202,6 +255,8 @@ public class AUVAPIController : MonoBehaviour
 
     public bool TryGetAUVSideSonarLines(int auv_id, out SideSonarPointReading[] leftLine, out SideSonarPointReading[] rightLine)
     {
+        MarkSideSonarDemand();
+
         if (TryGetAUVSideSonarData(auv_id, out SideSonarData data))
         {
             leftLine = data.leftLine;
@@ -214,30 +269,72 @@ public class AUVAPIController : MonoBehaviour
         return false;
     }
 
-    // Возвращает последний потокобезопасный снимок камеры конкретного AUV.
-    // В rgba32 лежит изображение в формате RGBA32, упакованное построчно.
+    // Возвращает последний снимок камеры конкретного AUV.
+    // rgba32 - ReadOnlyMemory на внутренний буфер AUVCamera без копирования.
     public bool TryGetAUVCameraData(int auv_id, out AUVCameraData cameraData)
     {
-        lock (stateLock)
+        cameraData = default;
+        if (!TryGetAUV(auv_id, out AUV auv) || auv == null)
         {
-            if (!cameraByAuvId.TryGetValue(auv_id, out AUVCameraData cachedData) || !cachedData.IsValid)
-            {
-                cameraData = default;
-                return false;
-            }
-
-            cameraData = CloneCameraData(cachedData);
-            return true;
+            return false;
         }
+
+        if (!auv.TryGetCameraSnapshot(out AUVCamera.SnapshotData snapshot) || !snapshot.IsValid)
+        {
+            return false;
+        }
+
+        AUVCamera.CameraInfo info = snapshot.info;
+        cameraData = new AUVCameraData
+        {
+            auvId = auv.id,
+            width = info.width,
+            height = info.height,
+            aspect = info.aspect,
+            orthographic = info.orthographic,
+            orthographicSize = info.orthographicSize,
+            fieldOfView = info.fieldOfView,
+            nearClipPlane = info.nearClipPlane,
+            farClipPlane = info.farClipPlane,
+            worldPosition = info.worldPosition,
+            worldRotation = info.worldRotation,
+            capturedAtTime = info.capturedAtTime,
+            sequence = info.sequence,
+            rgba32 = snapshot.rgba32
+        };
+
+        return true;
     }
 
-    public bool TryGetAUVCameraImage(int auv_id, out byte[] rgba32, out int width, out int height)
+    public bool TryGetAUVCameraImage(int auv_id, out ReadOnlyMemory<byte> rgba32, out int width, out int height)
     {
         if (TryGetAUVCameraData(auv_id, out AUVCameraData cameraData))
         {
             rgba32 = cameraData.rgba32;
             width = cameraData.width;
             height = cameraData.height;
+            return true;
+        }
+
+        rgba32 = ReadOnlyMemory<byte>.Empty;
+        width = 0;
+        height = 0;
+        return false;
+    }
+
+    // Совместимость со старым API: возвращает массив байтов без дополнительного копирования,
+    // если ReadOnlyMemory обернут вокруг обычного byte[].
+    public bool TryGetAUVCameraImage(int auv_id, out byte[] rgba32, out int width, out int height)
+    {
+        if (TryGetAUVCameraImage(auv_id, out ReadOnlyMemory<byte> rgba32Memory, out width, out height))
+        {
+            if (MemoryMarshal.TryGetArray(rgba32Memory, out ArraySegment<byte> segment) && segment.Array != null && segment.Offset == 0 && segment.Count == segment.Array.Length)
+            {
+                rgba32 = segment.Array;
+                return true;
+            }
+
+            rgba32 = rgba32Memory.ToArray();
             return true;
         }
 
@@ -305,6 +402,41 @@ public class AUVAPIController : MonoBehaviour
         return TrySpawnAUVAt(worldPosition, worldEulerAngles, out spawnedAuvId);
     }
 
+    // Телепортирует существующий AUV к API-стартовой точке появления.
+    public bool TryTeleportAUVToSpawn(int auv_id)
+    {
+        return TryTeleportAUVTo(auv_id, apiSpawnWorldPosition, apiSpawnWorldEulerAngles);
+    }
+
+    // Потокобезопасно ставит телепорт существующего AUV в очередь.
+    // Реальное перемещение выполняется в FixedUpdate на Main Thread.
+    public bool TryTeleportAUVTo(int auv_id, Vector3 worldPosition, Vector3 worldEulerAngles)
+    {
+        if (auv_id < 0)
+        {
+            return false;
+        }
+
+        lock (stateLock)
+        {
+            if (!auvByIdSnapshot.ContainsKey(auv_id))
+            {
+                return false;
+            }
+        }
+
+        EnqueueTeleportRequest(auv_id, worldPosition, worldEulerAngles);
+        return true;
+    }
+
+    // Перегрузка для внешних API-клиентов, где удобнее передавать числа по отдельности.
+    public bool TryTeleportAUVTo(int auv_id, float x, float y, float z, float pitch, float yaw, float roll)
+    {
+        Vector3 worldPosition = new Vector3(x, y, z);
+        Vector3 worldEulerAngles = new Vector3(pitch, yaw, roll);
+        return TryTeleportAUVTo(auv_id, worldPosition, worldEulerAngles);
+    }
+
     // Обновляет точку/ориентацию спавна, используемые TrySpawnAUV(out int).
     public void SetAPISpawnTransform(Vector3 worldPosition, Vector3 worldEulerAngles)
     {
@@ -354,12 +486,142 @@ public class AUVAPIController : MonoBehaviour
         return true;
     }
 
+    private void ConfigureSnapshotRefreshInterval()
+    {
+        AUVSettings settings = AUVSettings.GetOrFind();
+        float mbesRate = settings != null ? settings.MBESPublishRateHz : FallbackSnapshotRefreshRateHz;
+        float sideSonarRate = settings != null ? settings.SideSonarPublishRateHz : FallbackSnapshotRefreshRateHz;
+        float refreshRate = Mathf.Max(0.1f, Mathf.Max(mbesRate, sideSonarRate));
+        snapshotRefreshInterval = 1f / refreshRate;
+        snapshotRefreshTimer = snapshotRefreshInterval;
+    }
+
+    private void MarkMBESDemand()
+    {
+        Interlocked.Exchange(ref mbesDemandTicks, DateTime.UtcNow.Ticks);
+    }
+
+    private void MarkSideSonarDemand()
+    {
+        Interlocked.Exchange(ref sideSonarDemandTicks, DateTime.UtcNow.Ticks);
+    }
+
+    private static bool IsDemandActive(ref long demandTicks)
+    {
+        long observedTicks = Interlocked.Read(ref demandTicks);
+        if (observedTicks <= 0)
+        {
+            return false;
+        }
+
+        long ageTicks = DateTime.UtcNow.Ticks - observedTicks;
+        return ageTicks <= TimeSpan.FromSeconds(SensorDemandKeepAliveSeconds).Ticks;
+    }
+
+    private void OnAUVRegistered(AUV auv)
+    {
+        if (auv == null)
+        {
+            return;
+        }
+
+        if (!auvById.ContainsKey(auv.id))
+        {
+            auvById.Add(auv.id, auv);
+        }
+        else
+        {
+            auvById[auv.id] = auv;
+        }
+
+        lock (stateLock)
+        {
+            auvByIdSnapshot = new Dictionary<int, AUV>(auvById);
+        }
+
+        snapshotRefreshTimer = snapshotRefreshInterval;
+    }
+
+    private void OnAUVUnregistered(AUV auv)
+    {
+        if (auv == null)
+        {
+            return;
+        }
+
+        RemoveAUVFromCaches(auv.id);
+    }
+
+    private void EnqueueTeleportRequest(int auvId, Vector3 worldPosition, Vector3 worldEulerAngles)
+    {
+        lock (commandQueueLock)
+        {
+            pendingTeleportRequests.Enqueue(new TeleportRequest
+            {
+                auvId = auvId,
+                worldPosition = worldPosition,
+                worldEulerAngles = worldEulerAngles
+            });
+        }
+    }
+
+    private void ProcessQueuedCommands()
+    {
+        while (TryDequeueTeleportRequest(out TeleportRequest request))
+        {
+            ExecuteTeleportAUVTo(request.auvId, request.worldPosition, request.worldEulerAngles);
+        }
+    }
+
+    private bool TryDequeueTeleportRequest(out TeleportRequest request)
+    {
+        lock (commandQueueLock)
+        {
+            if (pendingTeleportRequests.Count == 0)
+            {
+                request = default;
+                return false;
+            }
+
+            request = pendingTeleportRequests.Dequeue();
+            return true;
+        }
+    }
+
+    private bool ExecuteTeleportAUVTo(int auvId, Vector3 worldPosition, Vector3 worldEulerAngles)
+    {
+        if (!TryGetAUV(auvId, out AUV auv) || auv == null)
+        {
+            return false;
+        }
+
+        auv.SetAllMotorForces(0f);
+
+        Quaternion worldRotation = Quaternion.Euler(worldEulerAngles);
+        Transform auvTransform = auv.transform;
+        Rigidbody rigidbody = auv.GetComponent<Rigidbody>();
+
+        if (rigidbody != null)
+        {
+            rigidbody.linearVelocity = Vector3.zero;
+            rigidbody.angularVelocity = Vector3.zero;
+            rigidbody.position = worldPosition;
+            rigidbody.rotation = worldRotation;
+            rigidbody.Sleep();
+        }
+        else
+        {
+            auvTransform.SetPositionAndRotation(worldPosition, worldRotation);
+        }
+
+        RefreshSnapshotsAfterSpawn();
+        return true;
+    }
+
     private void RefreshSnapshotsAfterSpawn()
     {
-        RefreshAUVCache();
         RefreshMBESSnapshots();
         RefreshSideSonarSnapshots();
-        RefreshCameraSnapshots();
     }
 
     private void RemoveAUVFromCaches(int auvId)
@@ -371,7 +633,6 @@ public class AUVAPIController : MonoBehaviour
             auvByIdSnapshot.Remove(auvId);
             mbesByAuvId.Remove(auvId);
             sideSonarByAuvId.Remove(auvId);
-            cameraByAuvId.Remove(auvId);
         }
     }
 
@@ -403,10 +664,21 @@ public class AUVAPIController : MonoBehaviour
         {
             auvByIdSnapshot = new Dictionary<int, AUV>(auvById);
         }
+
+        snapshotRefreshTimer = snapshotRefreshInterval;
     }
 
     private void RefreshMBESSnapshots()
     {
+        if (auvById.Count == 0)
+        {
+            lock (stateLock)
+            {
+                mbesByAuvId = new Dictionary<int, MBESData>();
+            }
+            return;
+        }
+
         Dictionary<int, MBESData> freshSnapshots = new Dictionary<int, MBESData>(auvById.Count);
 
         foreach (KeyValuePair<int, AUV> pair in auvById)
@@ -428,6 +700,15 @@ public class AUVAPIController : MonoBehaviour
 
     private void RefreshSideSonarSnapshots()
     {
+        if (auvById.Count == 0)
+        {
+            lock (stateLock)
+            {
+                sideSonarByAuvId = new Dictionary<int, SideSonarData>();
+            }
+            return;
+        }
+
         Dictionary<int, SideSonarData> freshSnapshots = new Dictionary<int, SideSonarData>(auvById.Count);
 
         foreach (KeyValuePair<int, AUV> pair in auvById)
@@ -444,44 +725,6 @@ public class AUVAPIController : MonoBehaviour
         lock (stateLock)
         {
             sideSonarByAuvId = freshSnapshots;
-        }
-    }
-
-    private void RefreshCameraSnapshots()
-    {
-        Dictionary<int, AUVCameraData> freshSnapshots = new Dictionary<int, AUVCameraData>(auvById.Count);
-
-        foreach (KeyValuePair<int, AUV> pair in auvById)
-        {
-            AUV auv = pair.Value;
-            if (auv == null || !auv.TryGetCameraSnapshot(out AUVCamera.SnapshotData snapshot) || !snapshot.IsValid)
-            {
-                continue;
-            }
-
-            AUVCamera.CameraInfo info = snapshot.info;
-            freshSnapshots[pair.Key] = new AUVCameraData
-            {
-                auvId = auv.id,
-                width = info.width,
-                height = info.height,
-                aspect = info.aspect,
-                orthographic = info.orthographic,
-                orthographicSize = info.orthographicSize,
-                fieldOfView = info.fieldOfView,
-                nearClipPlane = info.nearClipPlane,
-                farClipPlane = info.farClipPlane,
-                worldPosition = info.worldPosition,
-                worldRotation = info.worldRotation,
-                capturedAtTime = info.capturedAtTime,
-                sequence = info.sequence,
-                rgba32 = snapshot.rgba32
-            };
-        }
-
-        lock (stateLock)
-        {
-            cameraByAuvId = freshSnapshots;
         }
     }
 
@@ -650,27 +893,6 @@ public class AUVAPIController : MonoBehaviour
             sequence = source.sequence,
             leftLine = source.leftLine != null ? (SideSonarPointReading[])source.leftLine.Clone() : Array.Empty<SideSonarPointReading>(),
             rightLine = source.rightLine != null ? (SideSonarPointReading[])source.rightLine.Clone() : Array.Empty<SideSonarPointReading>()
-        };
-    }
-
-    private static AUVCameraData CloneCameraData(AUVCameraData source)
-    {
-        return new AUVCameraData
-        {
-            auvId = source.auvId,
-            width = source.width,
-            height = source.height,
-            aspect = source.aspect,
-            orthographic = source.orthographic,
-            orthographicSize = source.orthographicSize,
-            fieldOfView = source.fieldOfView,
-            nearClipPlane = source.nearClipPlane,
-            farClipPlane = source.farClipPlane,
-            worldPosition = source.worldPosition,
-            worldRotation = source.worldRotation,
-            capturedAtTime = source.capturedAtTime,
-            sequence = source.sequence,
-            rgba32 = source.rgba32 != null ? (byte[])source.rgba32.Clone() : Array.Empty<byte>()
         };
     }
 

@@ -8,6 +8,8 @@ public class AUVSettings : MonoBehaviour
     private const int DefaultMBESPointsCount = 1024;
     private const int DefaultMBESDistance = 80;
     private const float DefaultMBESMaxRange = 200f;
+    private const float DefaultMBESPublishRateHz = 35f;
+    private const float LegacyDefaultSensorRateHz = 60f;
     private static readonly Vector3 DefaultMBESLookDirection = Vector3.down;
     private static readonly Vector3 DefaultMBESSpanDirection = Vector3.right;
     private const float DefaultSideSonarMaxRange = 200f;
@@ -15,6 +17,7 @@ public class AUVSettings : MonoBehaviour
     private const float DefaultSideSonarSwathPerSide = 100f;
     private const float DefaultSideSonarDownAngleDegrees = 45f;
     private const float DefaultSideSonarDistanceAttenuation = 0.05f;
+    private const float DefaultSideSonarPublishRateHz = 35f;
     private const int DefaultCameraWidth = 128;
     private const int DefaultCameraHeight = 128;
     private const float DefaultCameraAspect = 1f;
@@ -23,6 +26,7 @@ public class AUVSettings : MonoBehaviour
     private const float DefaultCameraFieldOfView = 60f;
     private const float DefaultCameraNearClipPlane = 0.3f;
     private const float DefaultCameraFarClipPlane = 100f;
+    private const float DefaultCameraSnapshotRateHz = 35f;
 
     // === Структуры данных ===
     [Serializable]
@@ -81,6 +85,7 @@ public class AUVSettings : MonoBehaviour
     [SerializeField] public int MBESPointsCount = DefaultMBESPointsCount; // количество точек
     [SerializeField] public int MBESDistance = DefaultMBESDistance; // ширина в метрах
     [SerializeField] public float MBESMaxRange = 200f; // максимальная длина луча
+    [SerializeField] public float MBESPublishRateHz = DefaultMBESPublishRateHz; // частота публикации MBES
     [SerializeField] public Vector3 MBESLookDirection = new Vector3(0f, -1f, 0f); // куда смотрит центральный луч в локальных координатах MBESPoint
     [SerializeField] public Vector3 MBESSpanDirection = new Vector3(1f, 0f, 0f); // вдоль какой оси строится полоса в локальных координатах MBESPoint
     
@@ -95,6 +100,7 @@ public class AUVSettings : MonoBehaviour
     [SerializeField] private float cameraFieldOfView = DefaultCameraFieldOfView;
     [SerializeField] private float cameraNearClipPlane = DefaultCameraNearClipPlane;
     [SerializeField] private float cameraFarClipPlane = DefaultCameraFarClipPlane;
+    [SerializeField] private float cameraSnapshotRateHz = DefaultCameraSnapshotRateHz;
     
     [Header("Side Sonars")]
     [SerializeField] public float SideSonarMaxRange = DefaultSideSonarMaxRange;
@@ -102,6 +108,7 @@ public class AUVSettings : MonoBehaviour
     [SerializeField] public float SideSonarSwathPerSide = DefaultSideSonarSwathPerSide;
     [SerializeField] public float SideSonarDownAngleDegrees = DefaultSideSonarDownAngleDegrees;
     [SerializeField] public float SideSonarDistanceAttenuation = DefaultSideSonarDistanceAttenuation;
+    [SerializeField] public float SideSonarPublishRateHz = DefaultSideSonarPublishRateHz;
 
     // === Переменные класса ===
     private static AUVSettings shared;
@@ -120,6 +127,7 @@ public class AUVSettings : MonoBehaviour
     public float CameraFieldOfView => cameraFieldOfView;
     public float CameraNearClipPlane => cameraNearClipPlane;
     public float CameraFarClipPlane => cameraFarClipPlane;
+    public float CameraSnapshotRateHz => cameraSnapshotRateHz;
 
     public SensorCameraSettings GetSensorCameraSettings()
     {
@@ -205,6 +213,11 @@ public class AUVSettings : MonoBehaviour
         {
             MBESMaxRange = DefaultMBESMaxRange;
         }
+        if (Mathf.Approximately(MBESPublishRateHz, LegacyDefaultSensorRateHz))
+        {
+            MBESPublishRateHz = DefaultMBESPublishRateHz;
+        }
+        MBESPublishRateHz = Mathf.Max(0.1f, MBESPublishRateHz);
 
         if (MBESLookDirection.sqrMagnitude < 0.0001f)
         {
@@ -225,6 +238,11 @@ public class AUVSettings : MonoBehaviour
         SideSonarSwathPerSide = Mathf.Max(1f, SideSonarSwathPerSide);
         SideSonarDownAngleDegrees = Mathf.Clamp(SideSonarDownAngleDegrees, 1f, 89f);
         SideSonarDistanceAttenuation = Mathf.Max(0f, SideSonarDistanceAttenuation);
+        if (Mathf.Approximately(SideSonarPublishRateHz, LegacyDefaultSensorRateHz))
+        {
+            SideSonarPublishRateHz = DefaultSideSonarPublishRateHz;
+        }
+        SideSonarPublishRateHz = Mathf.Max(0.1f, SideSonarPublishRateHz);
 
         cameraWidth = Mathf.Max(16, cameraWidth);
         cameraHeight = Mathf.Max(16, cameraHeight);
@@ -251,6 +269,12 @@ public class AUVSettings : MonoBehaviour
         {
             cameraFarClipPlane = Mathf.Max(DefaultCameraFarClipPlane, cameraNearClipPlane + 0.1f);
         }
+
+        if (Mathf.Approximately(cameraSnapshotRateHz, LegacyDefaultSensorRateHz))
+        {
+            cameraSnapshotRateHz = DefaultCameraSnapshotRateHz;
+        }
+        cameraSnapshotRateHz = Mathf.Max(0.1f, cameraSnapshotRateHz);
     }
 
     private void Reset()
@@ -260,6 +284,7 @@ public class AUVSettings : MonoBehaviour
         MBESPointsCount = DefaultMBESPointsCount;
         MBESDistance = DefaultMBESDistance;
         MBESMaxRange = DefaultMBESMaxRange;
+        MBESPublishRateHz = DefaultMBESPublishRateHz;
         MBESLookDirection = DefaultMBESLookDirection;
         MBESSpanDirection = DefaultMBESSpanDirection;
         SideSonarMaxRange = DefaultSideSonarMaxRange;
@@ -267,6 +292,7 @@ public class AUVSettings : MonoBehaviour
         SideSonarSwathPerSide = DefaultSideSonarSwathPerSide;
         SideSonarDownAngleDegrees = DefaultSideSonarDownAngleDegrees;
         SideSonarDistanceAttenuation = DefaultSideSonarDistanceAttenuation;
+        SideSonarPublishRateHz = DefaultSideSonarPublishRateHz;
         cameraWidth = DefaultCameraWidth;
         cameraHeight = DefaultCameraHeight;
         cameraDepthBufferBits = 24;
@@ -277,6 +303,7 @@ public class AUVSettings : MonoBehaviour
         cameraFieldOfView = DefaultCameraFieldOfView;
         cameraNearClipPlane = DefaultCameraNearClipPlane;
         cameraFarClipPlane = DefaultCameraFarClipPlane;
+        cameraSnapshotRateHz = DefaultCameraSnapshotRateHz;
     }
 
     // Регистрирует общий экземпляр настроек

@@ -1,9 +1,12 @@
 using System;
 using UnityEngine;
+using System.Threading;
 
 [RequireComponent(typeof(Camera))]
 public class AUVCamera : MonoBehaviour
 {
+    private const float SnapshotDemandKeepAliveSeconds = 2f;
+
     public struct CameraInfo
     {
         public int width;
@@ -25,9 +28,9 @@ public class AUVCamera : MonoBehaviour
     public struct SnapshotData
     {
         public CameraInfo info;
-        public byte[] rgba32;
+        public ReadOnlyMemory<byte> rgba32;
 
-        public bool IsValid => info.IsValid && rgba32 != null && rgba32.Length > 0;
+        public bool IsValid => info.IsValid && !rgba32.IsEmpty;
     }
 
     [SerializeField] private Camera auvcamera;
@@ -37,8 +40,11 @@ public class AUVCamera : MonoBehaviour
 
     private AUVSettings settings;
     private byte[] latestSnapshotBytes = Array.Empty<byte>();
-    private float lastCapturedAtTime;
-    private long snapshotSequence;
+    private CameraInfo latestCameraInfo;
+    private readonly object snapshotLock = new object();
+    private float snapshotInterval = 0f;
+    private float snapshotTimer = 0f;
+    private long snapshotDemandTicks = 0;
 
     private void Awake()
     {
@@ -48,12 +54,30 @@ public class AUVCamera : MonoBehaviour
     private void OnEnable()
     {
         Init();
+        snapshotTimer = snapshotInterval;
     }
 
     private void LateUpdate()
     {
         Init();
-        RenderSnapshot();
+
+        if (!ShouldCaptureSnapshots())
+        {
+            return;
+        }
+
+        if (snapshotInterval <= 0f)
+        {
+            RenderSnapshot();
+            return;
+        }
+
+        snapshotTimer += Time.deltaTime;
+        if (snapshotTimer >= snapshotInterval)
+        {
+            snapshotTimer -= snapshotInterval;
+            RenderSnapshot();
+        }
     }
 
     private void OnDestroy()
@@ -102,6 +126,7 @@ public class AUVCamera : MonoBehaviour
         auvcamera.fieldOfView = cameraSettings.fieldOfView;
         auvcamera.nearClipPlane = cameraSettings.nearClipPlane;
         auvcamera.farClipPlane = cameraSettings.farClipPlane;
+        snapshotInterval = CalculateSnapshotInterval(settings != null ? settings.CameraSnapshotRateHz : 35f);
     }
 
     private void EnsureTextures()
@@ -175,9 +200,12 @@ public class AUVCamera : MonoBehaviour
             cpuTexture = null;
         }
 
-        latestSnapshotBytes = Array.Empty<byte>();
-        lastCapturedAtTime = 0f;
-        snapshotSequence = 0;
+        lock (snapshotLock)
+        {
+            latestSnapshotBytes = Array.Empty<byte>();
+            latestCameraInfo = default;
+        }
+        snapshotTimer = 0f;
     }
 
     private void RenderSnapshot()
@@ -197,14 +225,30 @@ public class AUVCamera : MonoBehaviour
         cpuTexture.Apply(false, false);
 
         var rawData = cpuTexture.GetRawTextureData<byte>();
-        if (latestSnapshotBytes.Length != rawData.Length)
+        lock (snapshotLock)
         {
-            latestSnapshotBytes = new byte[rawData.Length];
-        }
+            if (latestSnapshotBytes.Length != rawData.Length)
+            {
+                latestSnapshotBytes = new byte[rawData.Length];
+            }
 
-        rawData.CopyTo(latestSnapshotBytes);
-        snapshotSequence += 1;
-        lastCapturedAtTime = Time.time;
+            rawData.CopyTo(latestSnapshotBytes);
+            latestCameraInfo = new CameraInfo
+            {
+                width = texture.width,
+                height = texture.height,
+                aspect = auvcamera.aspect,
+                orthographic = auvcamera.orthographic,
+                orthographicSize = auvcamera.orthographicSize,
+                fieldOfView = auvcamera.fieldOfView,
+                nearClipPlane = auvcamera.nearClipPlane,
+                farClipPlane = auvcamera.farClipPlane,
+                worldPosition = transform.position,
+                worldRotation = transform.rotation,
+                capturedAtTime = Time.time,
+                sequence = latestCameraInfo.sequence + 1
+            };
+        }
 
         RenderTexture.active = previousActive;
     }
@@ -221,43 +265,72 @@ public class AUVCamera : MonoBehaviour
 
     public bool TryGetCameraInfo(out CameraInfo info)
     {
-        if (auvcamera == null || texture == null || cpuTexture == null)
+        lock (snapshotLock)
         {
-            info = default;
-            return false;
+            if (!latestCameraInfo.IsValid)
+            {
+                info = default;
+                return false;
+            }
+
+            info = latestCameraInfo;
         }
 
-        info = new CameraInfo
-        {
-            width = texture.width,
-            height = texture.height,
-            aspect = auvcamera.aspect,
-            orthographic = auvcamera.orthographic,
-            orthographicSize = auvcamera.orthographicSize,
-            fieldOfView = auvcamera.fieldOfView,
-            nearClipPlane = auvcamera.nearClipPlane,
-            farClipPlane = auvcamera.farClipPlane,
-            worldPosition = transform.position,
-            worldRotation = transform.rotation,
-            capturedAtTime = lastCapturedAtTime,
-            sequence = snapshotSequence
-        };
         return true;
     }
 
     public bool TryGetSnapshotData(out SnapshotData snapshot)
     {
-        if (!TryGetCameraInfo(out CameraInfo info) || latestSnapshotBytes.Length == 0)
+        MarkSnapshotDemand();
+
+        lock (snapshotLock)
         {
-            snapshot = default;
+            if (latestSnapshotBytes.Length == 0 || !latestCameraInfo.IsValid)
+            {
+                snapshot = default;
+                return false;
+            }
+
+            snapshot = new SnapshotData
+            {
+                info = latestCameraInfo,
+                rgba32 = new ReadOnlyMemory<byte>(latestSnapshotBytes)
+            };
+        }
+
+        return true;
+    }
+
+    public void RequestSnapshot()
+    {
+        MarkSnapshotDemand();
+    }
+
+    private void MarkSnapshotDemand()
+    {
+        Interlocked.Exchange(ref snapshotDemandTicks, DateTime.UtcNow.Ticks);
+    }
+
+    private bool ShouldCaptureSnapshots()
+    {
+        long observedDemandTicks = Interlocked.Read(ref snapshotDemandTicks);
+        if (observedDemandTicks <= 0)
+        {
             return false;
         }
 
-        snapshot = new SnapshotData
+        long ageTicks = DateTime.UtcNow.Ticks - observedDemandTicks;
+        return ageTicks <= TimeSpan.FromSeconds(SnapshotDemandKeepAliveSeconds).Ticks;
+    }
+
+    private static float CalculateSnapshotInterval(float snapshotRateHz)
+    {
+        float safeRate = Mathf.Max(0.1f, snapshotRateHz);
+        if (safeRate >= 1000f)
         {
-            info = info,
-            rgba32 = (byte[])latestSnapshotBytes.Clone()
-        };
-        return true;
+            return 0f;
+        }
+
+        return 1f / safeRate;
     }
 }

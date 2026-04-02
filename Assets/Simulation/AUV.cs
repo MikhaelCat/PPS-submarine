@@ -7,6 +7,9 @@ using UnityEngine;
 [RequireComponent(typeof(Collider), typeof(Rigidbody), typeof(WaterObject))] // Требуется Colider и Rigbody и WaterObject
 public class AUV : MonoBehaviour
 {
+    public static event System.Action<AUV> Registered;
+    public static event System.Action<AUV> Unregistered;
+
     private static readonly Vector3 DefaultInertiaTensor = new Vector3(3333.3333f, 1666.6666f, 3333.3333f);
     private const float MBESOriginOffset = 0.05f;
     private const int MBESTextureHeight = 24;
@@ -112,6 +115,10 @@ public class AUV : MonoBehaviour
     private int sideSonarRightHitCount = 0;
     private SideSonarHit sideSonarLeftHit;
     private SideSonarHit sideSonarRightHit;
+    private float mbesUpdateInterval = 0f;
+    private float sideSonarUpdateInterval = 0f;
+    private float mbesUpdateTimer = 0f;
+    private float sideSonarUpdateTimer = 0f;
 
     // === UI ===
     private GUIStyle uiTitleStyle;
@@ -207,6 +214,7 @@ public class AUV : MonoBehaviour
     {
         SetID();
         Init();
+        Registered?.Invoke(this);
     }
 
     private void OnValidate()
@@ -218,17 +226,23 @@ public class AUV : MonoBehaviour
     private void FixedUpdate()
     {
         ApllyMotorForce();
-        MBESUpdate();
-        SideSonarUpdate();
+        UpdateSensorsByRate();
     }
 
     private void OnGUI()
     {
+        if (!UIOn)
+        {
+            return;
+        }
+
         UIDisplay();
     }
 
     private void OnDestroy()
     {
+        Unregistered?.Invoke(this);
+
         if (mbesTexture != null)
         {
             if (Application.isPlaying) Destroy(mbesTexture);
@@ -484,6 +498,8 @@ public class AUV : MonoBehaviour
         mbesPointsCount = Mathf.Max(2, auvSettings.MBESPointsCount);
         mbesDistance = Mathf.Clamp(auvSettings.MBESDistance, 1f, 100f);
         mbesMaxRange = Mathf.Max(0.1f, auvSettings.MBESMaxRange);
+        mbesUpdateInterval = CalculateUpdateInterval(auvSettings.MBESPublishRateHz);
+        mbesUpdateTimer = mbesUpdateInterval;
         mbesPoint = ResolveSensorTransform(localMBESPoint, MBESPointSearchNames);
         mbesLookDirectionLocal = NormalizeDirection(auvSettings.MBESLookDirection, Vector3.down);
         mbesSpanDirectionLocal = NormalizeDirection(auvSettings.MBESSpanDirection, Vector3.right);
@@ -504,7 +520,10 @@ public class AUV : MonoBehaviour
         mbesFarthestHitRange = 0f;
         mbesHitCount = 0;
 
-        EnsureMBESTexture();
+        if (ShouldUpdateDebugTextures())
+        {
+            EnsureMBESTexture();
+        }
     }
 
     private void MBESUpdate()
@@ -581,7 +600,10 @@ public class AUV : MonoBehaviour
             mbesFarthestHitRange = 0f;
         }
 
-        UpdateMBESTexture();
+        if (ShouldUpdateDebugTextures())
+        {
+            UpdateMBESTexture();
+        }
     }
 
     public int GetMBESPointCount()
@@ -645,6 +667,11 @@ public class AUV : MonoBehaviour
         }
 
         return direction.normalized;
+    }
+
+    private bool ShouldUpdateDebugTextures()
+    {
+        return UIOn;
     }
 
     private void EnsureMBESTexture()
@@ -727,6 +754,8 @@ public class AUV : MonoBehaviour
     {
         sideSonarLeftPoint = ResolveSensorTransform(localSideSonarLeftPoint, SideSonarLeftSearchNames);
         sideSonarRightPoint = ResolveSensorTransform(localSideSonarRightPoint, SideSonarRightSearchNames);
+        sideSonarUpdateInterval = CalculateUpdateInterval(auvSettings.SideSonarPublishRateHz);
+        sideSonarUpdateTimer = sideSonarUpdateInterval;
         sideSonarMaxRange = Mathf.Max(0.1f, auvSettings.SideSonarMaxRange);
         sideSonarPointsPerSide = Mathf.Max(8, auvSettings.SideSonarPointsPerSide);
         sideSonarSwathPerSide = Mathf.Max(1f, auvSettings.SideSonarSwathPerSide);
@@ -743,8 +772,11 @@ public class AUV : MonoBehaviour
         sideSonarLeftHit = GetRepresentativeSideSonarHit(sideSonarLeftLine);
         sideSonarRightHit = GetRepresentativeSideSonarHit(sideSonarRightLine);
 
-        EnsureSideSonarTextures();
-        UpdateSideSonarTextures();
+        if (ShouldUpdateDebugTextures())
+        {
+            EnsureSideSonarTextures();
+            UpdateSideSonarTextures();
+        }
     }
 
     private void SideSonarUpdate()
@@ -760,7 +792,10 @@ public class AUV : MonoBehaviour
         sideSonarLeftHit = GetRepresentativeSideSonarHit(sideSonarLeftLine);
         sideSonarRightHit = GetRepresentativeSideSonarHit(sideSonarRightLine);
 
-        UpdateSideSonarTextures();
+        if (ShouldUpdateDebugTextures())
+        {
+            UpdateSideSonarTextures();
+        }
     }
 
     private int SampleSideSonarLine(Transform sonarTransform, int sideSign, SideSonarHit[] targetLine)
@@ -1080,6 +1115,8 @@ public class AUV : MonoBehaviour
             CameraInit();
         }
 
+        sensorCamera?.RequestSnapshot();
+
         if (sensorCamera != null && sensorCamera.TryGetSnapshotData(out snapshot))
         {
             return true;
@@ -1170,6 +1207,52 @@ public class AUV : MonoBehaviour
         }
 
         return null;
+    }
+
+    private static float CalculateUpdateInterval(float updateRateHz)
+    {
+        float safeRate = Mathf.Max(0.1f, updateRateHz);
+        float fixedDelta = Mathf.Max(0.0001f, Time.fixedDeltaTime);
+        float fixedRate = 1f / fixedDelta;
+        if (safeRate >= fixedRate)
+        {
+            return 0f;
+        }
+
+        return 1f / safeRate;
+    }
+
+    private void UpdateSensorsByRate()
+    {
+        float fixedDelta = Time.fixedDeltaTime;
+
+        if (mbesUpdateInterval <= 0f)
+        {
+            MBESUpdate();
+        }
+        else
+        {
+            mbesUpdateTimer += fixedDelta;
+            if (mbesUpdateTimer >= mbesUpdateInterval)
+            {
+                mbesUpdateTimer -= mbesUpdateInterval;
+                MBESUpdate();
+            }
+        }
+
+        if (sideSonarUpdateInterval <= 0f)
+        {
+            SideSonarUpdate();
+        }
+        else
+        {
+            sideSonarUpdateTimer += fixedDelta;
+            if (sideSonarUpdateTimer >= sideSonarUpdateInterval)
+            {
+                sideSonarUpdateTimer -= sideSonarUpdateInterval;
+                SideSonarUpdate();
+            }
+        }
     }
 
     // === UI ===
