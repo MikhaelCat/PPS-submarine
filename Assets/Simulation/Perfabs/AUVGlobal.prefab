@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 8207904732567899099}
   - component: {fileID: 1883576062455672966}
   - component: {fileID: 5615025722243540368}
+  - component: {fileID: 460675929936729885}
   m_Layer: 0
   m_Name: AUVGlobalScripts
   m_TagString: Untagged
@@ -96,6 +97,11 @@ MonoBehaviour:
   InputActions: {fileID: -944628639613478452, guid: 7d7ce558a7423f74ebbc63ef9167a4a5, type: 3}
   ActionMapName: AUV
   OrbitCamera: {fileID: 8349847981791679676}
+  SpawnPrefab: {fileID: 0}
+  SpawnParent: {fileID: 0}
+  SpawnWorldPosition: {x: 0, y: 50, z: 0}
+  SpawnWorldEulerAngles: {x: 0, y: 0, z: 0}
+  FocusSpawnedAUV: 1
   ForwardMove:
   - MotorId: 1
     Force: 100
@@ -157,6 +163,21 @@ MonoBehaviour:
   TopRearRotationVector: {x: 0, y: 1, z: 0}
   SideLeftRotationVector: {x: 1, y: 0, z: 0}
   SideRightRotationVector: {x: 1, y: 0, z: 0}
+--- !u!114 &460675929936729885
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4656255918731790969}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 62d4ee5289224b24782c6fca0ae51502, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AUVAPIController
+  controllerManager: {fileID: 1883576062455672966}
+  apiSpawnWorldPosition: {x: 0, y: 50, z: 0}
+  apiSpawnWorldEulerAngles: {x: 0, y: 0, z: 0}
 --- !u!1 &7036296403213995438
 GameObject:
   m_ObjectHideFlags: 0

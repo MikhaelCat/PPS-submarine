@@ -247,6 +247,30 @@ public class AUVAPIController : MonoBehaviour
         return false;
     }
 
+    // Удаляет AUV по id и сразу убирает его из API-кэшей.
+    // Возвращает false, если AUV с таким id не найден.
+    public bool TryRemoveAUV(int auv_id)
+    {
+        if (!TryGetAUV(auv_id, out AUV auv) || auv == null)
+        {
+            return false;
+        }
+
+        auv.SetAllMotorForces(0f);
+
+        if (Application.isPlaying)
+        {
+            Destroy(auv.gameObject);
+        }
+        else
+        {
+            DestroyImmediate(auv.gameObject);
+        }
+
+        RemoveAUVFromCaches(auv_id);
+        return true;
+    }
+
     // Создает AUV через AUVControllerManager с его настройками спавна из Inspector.
     public bool TrySpawnAUV(out int spawnedAuvId)
     {
@@ -336,6 +360,19 @@ public class AUVAPIController : MonoBehaviour
         RefreshMBESSnapshots();
         RefreshSideSonarSnapshots();
         RefreshCameraSnapshots();
+    }
+
+    private void RemoveAUVFromCaches(int auvId)
+    {
+        auvById.Remove(auvId);
+
+        lock (stateLock)
+        {
+            auvByIdSnapshot.Remove(auvId);
+            mbesByAuvId.Remove(auvId);
+            sideSonarByAuvId.Remove(auvId);
+            cameraByAuvId.Remove(auvId);
+        }
     }
 
     // Пересобирает словарь id->AUV
