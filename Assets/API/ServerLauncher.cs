@@ -2,7 +2,6 @@ using System;
 using System.Reflection;
 using System.Collections.Generic;
 using System.Net.Sockets;
-using System.Reflection;
 using System.Threading.Tasks;
 using UnityEngine;
 
@@ -18,6 +17,13 @@ public class ServerLauncher : MonoBehaviour
     [Header("Dependencies")]
     public AUVAPIController auvController;
 
+    [Header("Geographic Settings")]
+    // Базовая позиция сцены в глобальных координатах (по умолчанию - Японское море,near Владивосток)
+    [Tooltip("Широта сцены (градусы)")]
+    public double sceneBaseLatitude = 43.115;
+    [Tooltip("Долгота сцены (градусы)")]
+    public double sceneBaseLongitude = 131.885;
+
     private ServerRuntime _server;
 
     void Start()
@@ -28,8 +34,6 @@ public class ServerLauncher : MonoBehaviour
         InvokeRepeating(nameof(BroadcastAuvList), 1f, 1.0f);
 
         // --- НИЗКОУРОВНЕВЫЕ КОМАНДЫ ---
-
-
         _server.AddRequest("set_motor_speed", (values) => {
             try
             {
@@ -37,7 +41,6 @@ public class ServerLauncher : MonoBehaviour
                 int motorId = Convert.ToInt32(values["motor_id"]);
                 float force = Convert.ToSingle(values["force"]);
                 int status = auvController.SetAUVMotorSpeed(auvId, motorId, force);
-                // Явно приводим анонимный тип к object
                 return Task.FromResult<(int, string, object)>((200, status == 0 ? "Success" : $"Error Code: {status}", (object)new { status }));
             }
             catch (Exception ex)
@@ -61,7 +64,6 @@ public class ServerLauncher : MonoBehaviour
         _server.AddRequest("get_motor_ids", (values) => {
             try
             {
-                // ИСПРАВЛЕНО: Добавлен auv_id, так как контроллер требует его для поиска моторов
                 int auvId = Convert.ToInt32(values["auv_id"]);
                 var ids = auvController.GetAUVMotorIds(auvId);
                 return Task.FromResult<(int, string, object)>((200, "Success", (object)new { motor_ids = ids }));
@@ -72,8 +74,31 @@ public class ServerLauncher : MonoBehaviour
             }
         });
 
-        // --- КОМАНДЫ ПО ТЕХНИЧЕСКОМУ ЗАДАНИЮ ---
+        // --- НОВАЯ КОМАНДА: Установка глобальной позиции сцены ---
+        _server.AddRequest("set_geo_position", (values) => {
+            try
+            {
+                double latitude = Convert.ToDouble(values["latitude"]);
+                double longitude = Convert.ToDouble(values["longitude"]);
 
+                sceneBaseLatitude = latitude;
+                sceneBaseLongitude = longitude;
+
+                Debug.Log($"[GeoPosition] Scene base position set to: {latitude}, {longitude}");
+
+                return Task.FromResult<(int, string, object)>((200, "Success", (object)new
+                {
+                    latitude = sceneBaseLatitude,
+                    longitude = sceneBaseLongitude
+                }));
+            }
+            catch (Exception ex)
+            {
+                return Task.FromResult<(int, string, object)>((400, ex.Message, null));
+            }
+        });
+
+        // --- КОМАНДЫ ПО ТЕХНИЧЕСКОМУ ЗАДАНИЮ ---
         _server.AddRequest("get_telemetry", (values) => {
             try
             {
@@ -94,15 +119,19 @@ public class ServerLauncher : MonoBehaviour
 
                 Rigidbody rb = targetAuv.GetComponent<Rigidbody>();
 
+                // Конвертируем локальные координаты в глобальные
+                var globalCoords = LocalToGeo(targetAuv.transform.position);
+
                 var telemetry = new
                 {
+                    latitude = globalCoords.latitude,
+                    longitude = globalCoords.longitude,
                     x = targetAuv.transform.position.x,
                     y = targetAuv.transform.position.z,
                     depth = -targetAuv.transform.position.y,
                     pitch = targetAuv.transform.eulerAngles.x,
                     roll = targetAuv.transform.eulerAngles.z,
                     yaw = targetAuv.transform.eulerAngles.y,
-                    // ИСПРАВЛЕНО: используем linearVelocity для новых версий Unity
                     speed = rb != null ? rb.linearVelocity.magnitude : 0f
                 };
 
@@ -123,7 +152,6 @@ public class ServerLauncher : MonoBehaviour
                 {
                     List<float> listX = new List<float>();
                     List<float> listY = new List<float>();
-
 
                     int step = 2;
                     for (int i = 0; i < mbesData.points.Length; i += step)
@@ -156,19 +184,13 @@ public class ServerLauncher : MonoBehaviour
 
                 if (auvController.TryGetAUVCameraImage(auvId, out byte[] rgba32, out int width, out int height))
                 {
-                    // 1. Создаем текстуру и загружаем сырые пиксели
                     Texture2D tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
                     tex.LoadRawTextureData(rgba32);
                     tex.Apply();
 
-                    // 2. Сжимаем в JPG с качеством 50%. 
-                    // Это визуально почти не изменит картинку 256x256, но сожмет ее до 10-15 КБ.
                     byte[] jpgBytes = tex.EncodeToJPG(50);
-
-                    // Обязательно выгружаем текстуру из памяти, иначе получим жесткую утечку (Memory Leak)
                     Destroy(tex);
 
-                    // 3. Кодируем бинарные данные JPG в текстовый формат Base64 для передачи через JSON
                     string base64Image = Convert.ToBase64String(jpgBytes);
 
                     return Task.FromResult<(int, string, object)>((200, "Success", (object)new { camera_image = base64Image }));
@@ -191,8 +213,6 @@ public class ServerLauncher : MonoBehaviour
 
                 if (auvController.TryGetAUVSideSonarData(auvId, out var sonarData))
                 {
-                    // Для Side Scan Sonar нам важнее всего интенсивность (отражающая способность дна)
-                    // Формируем два массива интенсивностей для левого и правого борта
                     float[] leftIntensities = new float[sonarData.pointsPerSide];
                     float[] rightIntensities = new float[sonarData.pointsPerSide];
 
@@ -269,23 +289,19 @@ public class ServerLauncher : MonoBehaviour
                 Rigidbody rb = targetAuv.GetComponent<Rigidbody>();
                 if (rb != null)
                 {
-                    // КРИТИЧЕСКИЙ МОМЕНТ: временно отключаем физику для телепортации
                     rb.isKinematic = true;
                     rb.linearVelocity = Vector3.zero;
                     rb.angularVelocity = Vector3.zero;
                 }
 
-                // Сброс моторов
                 var motorIds = auvController.GetAUVMotorIds(auvId);
                 foreach (var mId in motorIds) auvController.SetAUVMotorSpeed(auvId, mId, 0f);
 
-                // Перемещение
                 targetAuv.transform.position = offsetPos;
                 targetAuv.transform.rotation = Quaternion.Euler(baseRot);
 
                 if (rb != null)
                 {
-                    // Возвращаем физику обратно
                     rb.isKinematic = false;
                 }
 
@@ -293,6 +309,7 @@ public class ServerLauncher : MonoBehaviour
             }
             catch (Exception ex) { return Task.FromResult<(int, string, object)>((400, ex.Message, null)); }
         });
+
         _server.AddRequest("remove_auv", (values) => {
             try
             {
@@ -317,6 +334,46 @@ public class ServerLauncher : MonoBehaviour
         _server.Start();
     }
 
+    // ============================================
+    // ГЕОГРАФИЧЕСКИЕ КОНВЕРТАЦИИ
+    // ============================================
+
+    /// <summary>
+    /// Конвертирует локальные Unity координаты в глобальные (широта/долгота)
+    /// Использует упрощенную эвклидову аппроксимацию
+    /// </summary>
+    private (double latitude, double longitude) LocalToGeo(Vector3 localPos)
+    {
+        // Приблизительные константы (метров в градусе)
+        const double metersPerDegreeLat = 111111.0; // 1 градус широты ≈ 111.111 км
+        double metersPerDegreeLon = 111111.0 * Math.Cos(DegToRad(sceneBaseLatitude)); // Зависит от широты
+
+        // Unity: X = East, Z = North, Y = Up(Down для глубины)
+        double deltaLat = localPos.z / metersPerDegreeLat;
+        double deltaLon = localPos.x / metersPerDegreeLon;
+
+        double latitude = sceneBaseLatitude + deltaLat;
+        double longitude = sceneBaseLongitude + deltaLon;
+
+        return (latitude, longitude);
+    }
+
+    /// <summary>
+    /// Конвертирует градусы в радианы
+    /// </summary>
+    private double DegToRad(double degrees)
+    {
+        return degrees * Math.PI / 180.0;
+    }
+
+    /// <summary>
+    /// Конвертирует радианы в градусы
+    /// </summary>
+    private double RadToDeg(double radians)
+    {
+        return radians * 180.0 / Math.PI;
+    }
+
     private Vector3 ParseVector(object data)
     {
         var dict = data as Dictionary<string, object>;
@@ -329,25 +386,21 @@ public class ServerLauncher : MonoBehaviour
 
         try
         {
-            // Используем рефлексию, чтобы достать приватное поле auvByIdSnapshot
             FieldInfo field = typeof(AUVAPIController).GetField("auvByIdSnapshot",
                 BindingFlags.NonPublic | BindingFlags.Instance);
 
             if (field != null)
             {
-                // Получаем значение словаря из экземпляра auvController
                 var dict = field.GetValue(auvController) as Dictionary<int, AUV>;
 
                 if (dict != null)
                 {
                     List<int> ids;
-                    // Клонируем ключи (ID), чтобы избежать ошибок многопоточности
                     lock (dict)
                     {
                         ids = new List<int>(dict.Keys);
                     }
 
-                    // Отправляем пакет в Python
                     SendStreamData(new
                     {
                         type = "auv_list",
@@ -369,12 +422,17 @@ public class ServerLauncher : MonoBehaviour
         {
             int auvId = auv.id;
 
-            // 1. Стрим Телеметрии
+            // Конвертируем локальные координаты в глобальные
+            var globalCoords = LocalToGeo(auv.transform.position);
+
+            // 1. Стрим Телеметрии (С ГЛОБАЛЬНЫМИ КООРДИНАТАМИ!)
             Rigidbody rb = auv.GetComponent<Rigidbody>();
             SendStreamData(new
             {
                 type = "telemetry",
                 auv_id = auvId,
+                latitude = globalCoords.latitude,      // НОВОЕ ПО ТЗ 4.1.a
+                longitude = globalCoords.longitude,     // НОВОЕ ПО ТЗ 4.1.a
                 x = auv.transform.position.x,
                 y = auv.transform.position.z,
                 depth = -auv.transform.position.y,
@@ -426,7 +484,6 @@ public class ServerLauncher : MonoBehaviour
         }
     }
 
-    // Универсальный метод для упаковки и отправки JSON
     private void SendStreamData(object data)
     {
         try
@@ -446,5 +503,6 @@ public class ServerLauncher : MonoBehaviour
         _server?.Stop();
         _telemetryStreamer?.Close();
     }
+
     void OnApplicationQuit() => _server?.Stop();
 }
