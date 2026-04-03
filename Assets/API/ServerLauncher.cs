@@ -1,6 +1,8 @@
 using System;
+using System.Reflection;
 using System.Collections.Generic;
 using System.Net.Sockets;
+using System.Reflection;
 using System.Threading.Tasks;
 using UnityEngine;
 
@@ -23,6 +25,7 @@ public class ServerLauncher : MonoBehaviour
         _server = new ServerRuntime(port);
         _telemetryStreamer = new UdpClient();
         InvokeRepeating(nameof(StreamAllSensorData), 1f, 0.4f);
+        InvokeRepeating(nameof(BroadcastAuvList), 1f, 1.0f);
 
         // --- НИЗКОУРОВНЕВЫЕ КОМАНДЫ ---
 
@@ -318,6 +321,45 @@ public class ServerLauncher : MonoBehaviour
     {
         var dict = data as Dictionary<string, object>;
         return new Vector3(Convert.ToSingle(dict["x"]), Convert.ToSingle(dict["y"]), Convert.ToSingle(dict["z"]));
+    }
+
+    private void BroadcastAuvList()
+    {
+        if (auvController == null) return;
+
+        try
+        {
+            // Используем рефлексию, чтобы достать приватное поле auvByIdSnapshot
+            FieldInfo field = typeof(AUVAPIController).GetField("auvByIdSnapshot",
+                BindingFlags.NonPublic | BindingFlags.Instance);
+
+            if (field != null)
+            {
+                // Получаем значение словаря из экземпляра auvController
+                var dict = field.GetValue(auvController) as Dictionary<int, AUV>;
+
+                if (dict != null)
+                {
+                    List<int> ids;
+                    // Клонируем ключи (ID), чтобы избежать ошибок многопоточности
+                    lock (dict)
+                    {
+                        ids = new List<int>(dict.Keys);
+                    }
+
+                    // Отправляем пакет в Python
+                    SendStreamData(new
+                    {
+                        type = "auv_list",
+                        ids = ids
+                    });
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[BroadcastAuvList] Reflection Error: {e.Message}");
+        }
     }
 
     private void StreamAllSensorData()
