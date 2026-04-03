@@ -1,10 +1,15 @@
-using UnityEngine;
 using System;
 using System.Collections.Generic;
+using System.Net.Sockets;
 using System.Threading.Tasks;
+using UnityEngine;
 
 public class ServerLauncher : MonoBehaviour
 {
+    [Header("Telemetry Stream")]
+    public int clientTelemetryPort = 8081;
+    private UdpClient _telemetryStreamer;
+
     [Header("Network Settings")]
     public int port = Settings.port;
 
@@ -15,12 +20,12 @@ public class ServerLauncher : MonoBehaviour
 
     void Start()
     {
-        AUVControllerManager manualManager = FindAnyObjectByType<AUVControllerManager>();
-        if (manualManager != null) manualManager.enabled = false;
-
         _server = new ServerRuntime(port);
+        _telemetryStreamer = new UdpClient();
+        InvokeRepeating(nameof(StreamAllSensorData), 1f, 0.4f);
 
         // --- НИЗКОУРОВНЕВЫЕ КОМАНДЫ ---
+
 
         _server.AddRequest("set_motor_speed", (values) => {
             try
@@ -28,7 +33,6 @@ public class ServerLauncher : MonoBehaviour
                 int auvId = Convert.ToInt32(values["auv_id"]);
                 int motorId = Convert.ToInt32(values["motor_id"]);
                 float force = Convert.ToSingle(values["force"]);
-
                 int status = auvController.SetAUVMotorSpeed(auvId, motorId, force);
                 // Явно приводим анонимный тип к object
                 return Task.FromResult<(int, string, object)>((200, status == 0 ? "Success" : $"Error Code: {status}", (object)new { status }));
@@ -296,6 +300,89 @@ public class ServerLauncher : MonoBehaviour
         return new Vector3(Convert.ToSingle(dict["x"]), Convert.ToSingle(dict["y"]), Convert.ToSingle(dict["z"]));
     }
 
-    void OnDestroy() => _server?.Stop();
+    private void StreamAllSensorData()
+    {
+        AUV[] allAuvs = FindObjectsByType<AUV>(FindObjectsInactive.Exclude);
+        foreach (var auv in allAuvs)
+        {
+            int auvId = auv.id;
+
+            // 1. Стрим Телеметрии
+            Rigidbody rb = auv.GetComponent<Rigidbody>();
+            SendStreamData(new
+            {
+                type = "telemetry",
+                auv_id = auvId,
+                x = auv.transform.position.x,
+                y = auv.transform.position.z,
+                depth = -auv.transform.position.y,
+                pitch = auv.transform.eulerAngles.x,
+                roll = auv.transform.eulerAngles.z,
+                yaw = auv.transform.eulerAngles.y,
+                speed = rb != null ? rb.linearVelocity.magnitude : 0f
+            });
+
+            // 2. Стрим Эхолота (MBES)
+            if (auvController.TryGetAUVMBESData(auvId, out var mbesData))
+            {
+                List<float> listX = new List<float>();
+                List<float> listY = new List<float>();
+                for (int i = 0; i < mbesData.points.Length; i += 2)
+                {
+                    if (mbesData.points[i].hasHit)
+                    {
+                        listX.Add((float)Math.Round(mbesData.points[i].pointLocal.x, 1));
+                        listY.Add((float)Math.Round(mbesData.points[i].pointLocal.y, 1));
+                    }
+                }
+                SendStreamData(new { type = "mbes", auv_id = auvId, points_x = listX, points_y = listY });
+            }
+
+            // 3. Стрим Сонара
+            if (auvController.TryGetAUVSideSonarData(auvId, out var sonarData))
+            {
+                float[] leftIntensities = new float[sonarData.pointsPerSide];
+                float[] rightIntensities = new float[sonarData.pointsPerSide];
+                for (int i = 0; i < sonarData.pointsPerSide; i++)
+                {
+                    leftIntensities[i] = sonarData.leftLine[i].intensity;
+                    rightIntensities[i] = sonarData.rightLine[i].intensity;
+                }
+                SendStreamData(new { type = "sonar", auv_id = auvId, left = leftIntensities, right = rightIntensities, max_range = sonarData.maxRange });
+            }
+
+            // 4. Стрим Камеры
+            if (auvController.TryGetAUVCameraImage(auvId, out byte[] rgba32, out int width, out int height))
+            {
+                Texture2D tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
+                tex.LoadRawTextureData(rgba32);
+                tex.Apply();
+                byte[] jpgBytes = tex.EncodeToJPG(50);
+                Destroy(tex);
+                SendStreamData(new { type = "camera", auv_id = auvId, camera_image = Convert.ToBase64String(jpgBytes) });
+            }
+        }
+    }
+
+    // Универсальный метод для упаковки и отправки JSON
+    private void SendStreamData(object data)
+    {
+        try
+        {
+            string json = Newtonsoft.Json.JsonConvert.SerializeObject(data);
+            byte[] bytes = System.Text.Encoding.UTF8.GetBytes(json);
+            _telemetryStreamer.Send(bytes, bytes.Length, "127.0.0.1", clientTelemetryPort);
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"Stream send error: {e.Message}");
+        }
+    }
+
+    void OnDestroy()
+    {
+        _server?.Stop();
+        _telemetryStreamer?.Close();
+    }
     void OnApplicationQuit() => _server?.Stop();
 }
