@@ -11,7 +11,6 @@ GameObject:
   - component: {fileID: 7219853000796597059}
   - component: {fileID: 8207904732567899099}
   - component: {fileID: 1883576062455672966}
-  - component: {fileID: 5615025722243540368}
   - component: {fileID: 460675929936729885}
   m_Layer: 0
   m_Name: AUVGlobalScripts
@@ -64,6 +63,7 @@ MonoBehaviour:
   MBESPointsCount: 1024
   MBESDistance: 80
   MBESMaxRange: 200
+  MBESPublishRateHz: 35
   MBESLookDirection: {x: 0, y: -1, z: 0}
   MBESSpanDirection: {x: 1, y: 0, z: 0}
   cameraWidth: 128
@@ -76,11 +76,13 @@ MonoBehaviour:
   cameraFieldOfView: 60
   cameraNearClipPlane: 0.3
   cameraFarClipPlane: 100
+  cameraSnapshotRateHz: 35
   SideSonarMaxRange: 200
   SideSonarPointsPerSide: 512
   SideSonarSwathPerSide: 100
   SideSonarDownAngleDegrees: 45
   SideSonarDistanceAttenuation: 0.05
+  SideSonarPublishRateHz: 35
 --- !u!114 &1883576062455672966
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -143,26 +145,6 @@ MonoBehaviour:
     Force: 100
   - MotorId: 4
     Force: -100
---- !u!114 &5615025722243540368
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4656255918731790969}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 88af9630a504fdc4a8b0c39d53e5abec, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::AUVAnimationSettings
-  TopFrontMotorId: 3
-  TopRearMotorId: 4
-  SideLeftMotorId: 1
-  SideRightMotorId: 2
-  TopFrontRotationVector: {x: 0, y: 1, z: 0}
-  TopRearRotationVector: {x: 0, y: 1, z: 0}
-  SideLeftRotationVector: {x: 1, y: 0, z: 0}
-  SideRightRotationVector: {x: 1, y: 0, z: 0}
 --- !u!114 &460675929936729885
 MonoBehaviour:
   m_ObjectHideFlags: 0

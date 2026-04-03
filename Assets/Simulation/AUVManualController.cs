@@ -282,7 +282,7 @@ public class AUVControllerManager : MonoBehaviour
     // Главный цикл ручного управления
     void Update()
     {
-        HandleSpawnShortcut();
+        HandleGlobalShortcuts();
 
         bool hadAuvBeforeUpdate = currentAuvId >= 0;
         if (!TryGetCurrentAUV(out AUV currentAuv))
@@ -336,6 +336,13 @@ public class AUVControllerManager : MonoBehaviour
 
     // === Спавн AUV ===
 
+    private void HandleGlobalShortcuts()
+    {
+        HandleSpawnShortcut();
+        HandleManualToggleShortcut();
+        HandleDeleteShortcut();
+    }
+
     private void HandleSpawnShortcut()
     {
         if (!IsSpawnShortcutPressed())
@@ -355,6 +362,79 @@ public class AUVControllerManager : MonoBehaviour
         }
 
         return keyboard.leftCtrlKey.isPressed || keyboard.rightCtrlKey.isPressed;
+    }
+
+    private void HandleManualToggleShortcut()
+    {
+        if (!IsManualToggleShortcutPressed())
+        {
+            return;
+        }
+
+        Included = !Included;
+
+        if (!Included && TryGetCurrentAUV(out AUV currentAuv))
+        {
+            currentAuv.SetAllMotorForces(0f);
+        }
+    }
+
+    private static bool IsManualToggleShortcutPressed()
+    {
+        Keyboard keyboard = Keyboard.current;
+        if (keyboard == null || !keyboard.mKey.wasPressedThisFrame)
+        {
+            return false;
+        }
+
+        return keyboard.leftCtrlKey.isPressed || keyboard.rightCtrlKey.isPressed;
+    }
+
+    private void HandleDeleteShortcut()
+    {
+        if (!IsDeleteShortcutPressed())
+        {
+            return;
+        }
+
+        TryDeleteCurrentAUV();
+    }
+
+    private static bool IsDeleteShortcutPressed()
+    {
+        Keyboard keyboard = Keyboard.current;
+        if (keyboard == null || !keyboard.deleteKey.wasPressedThisFrame)
+        {
+            return false;
+        }
+
+        return keyboard.leftCtrlKey.isPressed || keyboard.rightCtrlKey.isPressed;
+    }
+
+    private bool TryDeleteCurrentAUV()
+    {
+        if (!TryGetCurrentAUV(out AUV currentAuv) || currentAuv == null)
+        {
+            return false;
+        }
+
+        currentAuv.SetAllMotorForces(0f);
+
+        GameObject currentObject = currentAuv.gameObject;
+        currentObject.SetActive(false);
+
+        if (Application.isPlaying)
+        {
+            Destroy(currentObject);
+        }
+        else
+        {
+            DestroyImmediate(currentObject);
+        }
+
+        RefreshAUVs();
+        SetOrbitTargetToCurrentAUV();
+        return true;
     }
 
     public bool TrySpawnAUVFromPrefab()
@@ -456,11 +536,6 @@ public class AUVControllerManager : MonoBehaviour
     // Обрабатывает переключение активного AUV
     private void OnSwitchPerformed(InputAction.CallbackContext context)
     {
-        if (!Included)
-        {
-            return;
-        }
-
         if (TryGetCurrentAUV(out AUV currentAuv))
         {
             currentAuv.SetAllMotorForces(0f);
