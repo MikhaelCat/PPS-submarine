@@ -46,8 +46,8 @@ public class ServerLauncher : MonoBehaviour
         _server.AddRequest("get_auvs", (values) => {
             try
             {
-                var ids = auvController.GetAUVs();
-                return Task.FromResult<(int, string, object)>((200, "Success", (object)new { auv_ids = ids }));
+                var auvs = auvController.GetAUVs();
+                return Task.FromResult<(int, string, object)>((200, "Success", auvs));
             }
             catch (Exception ex)
             {
@@ -289,6 +289,26 @@ public class ServerLauncher : MonoBehaviour
                 return Task.FromResult<(int, string, object)>((200, "Success", (object)new { reset_id = auvId }));
             }
             catch (Exception ex) { return Task.FromResult<(int, string, object)>((400, ex.Message, null)); }
+        });
+        _server.AddRequest("remove_auv", (values) => {
+            try
+            {
+                int auvId = Convert.ToInt32(values["auv_id"]);
+                bool removed = auvController.TryRemoveAUV(auvId);
+
+                if (removed)
+                {
+                    return Task.FromResult<(int, string, object)>((200, "AUV Removed", new { auv_id = auvId }));
+                }
+                else
+                {
+                    return Task.FromResult<(int, string, object)>((404, "AUV not found", null));
+                }
+            }
+            catch (Exception ex)
+            {
+                return Task.FromResult<(int, string, object)>((400, ex.Message, null));
+            }
         });
 
         _server.Start();
